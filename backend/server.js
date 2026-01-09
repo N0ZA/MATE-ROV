@@ -10,7 +10,7 @@ const io = new Server(server);
 
 // --- 1. SET YOUR PORT ---
 // Run 'ls /dev/tty.usbmodem*' in terminal and paste the result here
-const PROTOCOL_PORT = '/dev/tty.usbmodem179820401'; 
+const PROTOCOL_PORT = '/dev/tty.usbmodem179820401';
 const BAUD_RATE = 115200;
 
 app.get('/', (req, res) => {
@@ -23,14 +23,14 @@ const port = new SerialPort({ path: PROTOCOL_PORT, baudRate: BAUD_RATE }, (err) 
 });
 
 // Parser ensures we read full lines ending in Newline
-const parser = port.pipe(new ReadlineParser({ delimiter: '\r\n' }));
+const parser = port.pipe(new ReadlineParser({ delimiter: '\n' }));
 
 parser.on('data', (line) => {
     try {
         // Line format: H:104.3,R:21.7,P:4.1,VX:-1.867,VY:-1.030,VZ:0.396
         const parts = line.split(',');
         const raw = {};
-        
+
         parts.forEach(part => {
             const [key, val] = part.split(':');
             raw[key] = parseFloat(val);
@@ -48,7 +48,7 @@ parser.on('data', (line) => {
         };
 
         io.emit('robot-data', payload);
-        
+
         // This confirms in your terminal that the backend is working
         console.log(`TEENSY DATA -> Yaw: ${payload.yaw} Pitch: ${payload.pitch} Roll: ${payload.roll}`);
 
