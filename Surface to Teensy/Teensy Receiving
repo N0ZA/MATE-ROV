@@ -1,0 +1,94 @@
+#include <QNEthernet.h>
+
+using namespace qindesign::network;
+
+// Teensy IP and port (same as TEENSY_IP / PORT in your Python)
+constexpr uint16_t localPort = 8888;
+
+EthernetUDP udp;
+
+// Expected frame size (16 bytes from pack_frame())
+const size_t FRAME_SIZE = 16;
+
+// decoded values
+int16_t T[6];  // 1100–1900
+uint8_t M[8];  // 0–15
+uint8_t R[4];  // 0–1
+
+void setup() {
+  Serial.begin(115200);
+  while (!Serial && millis() < 4000) { }
+
+  // Static IP (matches your TEENSY_IP: 192.168.2.177)
+  Ethernet.begin(
+    IPAddress(192, 168, 2, 177),
+    IPAddress(255, 255, 255, 0),   // subnet
+    IPAddress(192, 168, 2, 1)     // gateway (your router)
+  );
+
+  Serial.print("Ethernet IP: ");
+  Serial.println(Ethernet.localIP());
+
+  // Start UDP on 8888
+  udp.begin(localPort);
+  Serial.println("QNEthernet UDP listening on 8888 (192.168.2.177:8888)");
+}
+
+void loop() {
+  int packetSize = udp.parsePacket();
+  if (packetSize <= 0) {
+    return;  // no packet, or invalid
+  }
+
+  // Only handle 16‑byte frames
+  if (packetSize != FRAME_SIZE) {
+    Serial.print("Bad frame size: ");
+    Serial.println(packetSize);
+    return;
+  }
+
+  const uint8_t *frame = udp.data();  // frame starts at udp.data()
+
+  // Validate start byte
+  if (frame[0] != 0xAA) {
+    Serial.println("Bad start byte");
+    return;
+  }
+
+  // === 1. unpack thrusters T1–T6 (6×14bit, sent as 2×16bit big‑endian) ===
+  for (int i = 0; i < 6; i++) {
+    uint16_t raw = (frame[1 + 2*i + 0] << 8) |
+                   (frame[1 + 2*i + 1] << 0);
+    T[i] = raw;  // 1100–1900
+  }
+
+  // === 2. unpack motors M1–M8 (4 bytes, 8×4bit) ===
+  uint32_t mot_pack = 0;
+  for (int i = 0; i < 4; i++) {
+    mot_pack = (mot_pack << 8) | frame[13 + i];
+  }
+  for (int i = 0; i < 8; i++) {
+    M[7 - i] = (mot_pack >> (i * 4)) & 0xF;  // M1–M8: 0–15
+  }
+
+  // === 3. unpack relays R1–R4 from last byte low nibble ===
+  uint8_t rel_pack = frame[15] & 0x0F;  // 4 LSB = R1–R4
+  for (int i = 0; i < 4; i++) {
+    R[i] = (rel_pack >> i) & 1;
+  }
+
+  // Log like your Python
+  Serial.println("-- FRAME RECEIVED --");
+  Serial.printf("T1=%4d T2=%4d T3=%4d T4=%4d T5=%4d T6=%4d\n",
+                T[0], T[1], T[2], T[3], T[4], T[5]);
+  Serial.printf("M1-M8: %d %d %d %d %d %d %d %d\n",
+                M[0], M[1], M[2], M[3], M[4], M[5], M[6], M[7]);
+  Serial.printf("R1-R4: %d %d %d %d\n", R[0], R[1], R[2], R[3]);
+
+  // === ACK back to Python sender ===
+  IPAddress remoteIP = udp.remoteIP();
+  uint16_t remotePort = udp.remotePort();
+  udp.beginPacket(remoteIP, remotePort);
+  udp.write("ACK:ROV_FRAME_OK");
+  udp.endPacket();
+}
