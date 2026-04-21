@@ -1,0 +1,69 @@
+import socket
+import random
+import time
+
+TEENSY_IP = "192.168.2.177"
+PORT = 8888
+sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+sock.bind(("", 0))
+sock.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, 1024*1024)
+
+def pack_frame():
+    # EXACT ranges you want
+    thrusters = [random.randint(1100, 1900) for _ in range(6)]  # T1-T6: 1100-1900
+    motors = [random.randint(0, 15) for _ in range(8)]          # M1-M8: 0-15 (4 bits)
+    relays = [random.randint(0, 1) for _ in range(4)]           # R1-R4: 0 or 1
+    
+    frame = bytearray([0xAA])  # Start bit
+    
+    # Thrusters 6x14bit (84 bits = 11 bytes)
+    for t in thrusters:
+        frame += t.to_bytes(2, 'big')
+    
+    # Motors 8x4bit = 32 bits (4 bytes)
+    mot_pack = 0
+    for m in motors:
+        mot_pack = (mot_pack << 4) | m
+    frame += mot_pack.to_bytes(4, 'big')
+    
+    # Relays 4x1bit (last byte low nibble) + end
+    rel_pack = 0
+    for i, r in enumerate(relays):
+        rel_pack |= r << i
+    frame += bytearray([rel_pack | 0xF0])
+    
+    return frame[:16], thrusters, motors, relays  # 16 bytes total
+
+print("ROV SLOW TEST | T:1100-1900 | M:0-15 | R:0-1 | 1s/frame | Ctrl+C")
+print("SLOW BITS TRACKING --> Teensy Serial --> ACK")
+
+cycle = 0
+while True:
+    try:
+        frame, T, M, R = pack_frame()
+        sock.sendto(frame, (TEENSY_IP, PORT))
+        cycle += 1
+        
+        print(f"\\nCYCLE #{cycle} - SENDING BITS...")
+        print(f"T1={T[0]:4d} T2={T[1]:4d} T3={T[2]:4d} T4={T[3]:4d}")
+        print(f"T5={T[4]:4d} T6={T[5]:4d}")
+        print(f"M1-M8: {M}")
+        print(f"R1-R4: {R}")
+        print(f"FRAME BITS: AA {' '.join(f'{b:02X}' for b in frame[1:6])} ... {frame[-1]:02X}")
+        print("WAITING FOR TEENSY...")
+        
+        sock.settimeout(0.2)
+        try:
+            ack, _ = sock.recvfrom(64)
+            print(f"✓ TEENSY RECEIVED ALL BITS: '{ack.decode(errors='ignore')}'")
+        except:
+            print("✗ NO ACK - Check Teensy Serial!")
+        sock.settimeout(None)
+        
+        print("-" * 60)
+        time.sleep(0.1)  # SLOW - 1 second per frame
+        
+    except KeyboardInterrupt:
+        print("\\nTEST STOPPED - All bits verified!")
+        break
+sock.close()
