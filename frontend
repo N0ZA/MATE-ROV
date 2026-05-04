@@ -233,7 +233,7 @@
       const pitchMove = Math.max(-18, Math.min(18, pitch * -2));
 
       document.getElementById('yaw-needle').style.transform = `translateX(-50%) rotate(${yawAccum - 90}deg)`;
-      document.getElementById('pr-line').style.transform = `translate(-50%, ${pitchMove}px) rotate(${-roll}deg)`;
+      document.getElementById('pr-line').style.transform = `translate(-50%, ${pitchMove}px) rotate(${roll}deg)`;
       document.getElementById('pv').innerText = pitch.toFixed(1);
       document.getElementById('rv').innerText = roll.toFixed(1);
       document.getElementById('depth').innerText = ((data.depth ?? 0).toFixed ? (data.depth ?? 0).toFixed(2) : '0.00') + ' m';
