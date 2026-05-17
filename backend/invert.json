@@ -1,0 +1,18 @@
+{
+  "surge": false,
+  "sway": true,
+  "heave": false,
+  "yaw": true,
+  "pitch": false,
+  "roll": true,
+  "depthHoldDir": false,
+  "rollHoldDir": true,
+  "arm1Slew": false,
+  "arm1Shoulder": false,
+  "arm1Rotate": false,
+  "arm1Gripper": false,
+  "arm2Slew": false,
+  "arm2Shoulder": false,
+  "arm2Rotate": false,
+  "arm2Gripper": false
+}

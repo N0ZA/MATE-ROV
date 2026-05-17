@@ -1,0 +1,1260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Jalpari Mission Control v8</title>
+  <script src="/socket.io/socket.io.js"></script>
+  <style>
+    html, body { margin: 0; padding: 0; height: 100%; background: #0f172a; color: #f8fafc; font-family: 'Segoe UI', sans-serif; }
+    body { overflow: hidden; }
+    * { box-sizing: border-box; }
+    .main-layout { display: grid; grid-template-columns: 320px 1fr 340px; gap: 12px; height: 100vh; padding: 10px; min-width: 0; }
+    .card { background: #1e293b; padding: 10px; border-radius: 8px; border: 1px solid #334155; }
+    .column { display: flex; flex-direction: column; gap: 10px; height: 100%; min-height: 0; }
+    .left-column { overflow-y: auto; padding-right: 4px; min-height: 0; }
+    .right-column { overflow-y: auto; padding-left: 4px; min-height: 0; }
+
+    .dual-gimbals { display: flex; justify-content: space-between; gap: 10px; padding: 10px 0; }
+    .gimbal-wrap { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 5px; }
+    .gimbal-label { font-size: 10px; color: #94a3b8; text-transform: uppercase; font-weight: bold; }
+    .trackpad { width: 100%; aspect-ratio: 1 / 1; border-radius: 50%; border: 2px solid #334155; background: radial-gradient(circle at center, #1e293b, #0f172a); position: relative; overflow: hidden; box-shadow: inset 0 0 15px rgba(0,0,0,0.5); }
+    .trackpad::before, .trackpad::after { content: ""; position: absolute; background: #334155; }
+    .trackpad::before { left: 50%; top: 0; width: 2px; height: 100%; transform: translateX(-50%); }
+    .trackpad::after { top: 50%; left: 0; width: 100%; height: 2px; transform: translateY(-50%); }
+    .joystick-dot { position: absolute; left: 50%; top: 50%; width: 18px; height: 18px; border-radius: 50%; background: #38bdf8; box-shadow: 0 0 10px #38bdf8; transform: translate(-50%, -50%); pointer-events: none; transition: transform 0.05s linear; z-index: 2; }
+    .joystick-dot.right-stick { background: #facc15; box-shadow: 0 0 10px #facc15; }
+
+    .heave-yaw-display { width: 100%; aspect-ratio: 1 / 1; border-radius: 12px; border: 2px solid #334155; background: #0b1221; position: relative; overflow: hidden; display: flex; align-items: center; justify-content: center; perspective: 600px; }
+    .heave-yaw-display::before { content: ""; position: absolute; width: 100%; height: 2px; background: #1e293b; top: 50%; left: 0; transform: translateY(-50%); }
+    .heave-yaw-display::after { content: "SURFACE"; position: absolute; top: 4px; font-size: 8px; color: #475569; letter-spacing: 2px; }
+
+    .tiny-rov { position: relative; width: 40px; height: 60px; transition: transform 0.05s linear; z-index: 5; transform-style: preserve-3d; }
+    .tiny-rov-body { position: absolute; top: 10%; left: 10%; width: 80%; height: 80%; background: linear-gradient(to bottom, #facc15, #ca8a04); border-radius: 6px; z-index: 2; box-shadow: 0 5px 15px rgba(0,0,0,0.6); transform-style: preserve-3d; }
+    .tiny-rov-nose { position: absolute; top: -5px; left: 50%; transform: translateX(-50%) translateZ(10px); width: 16px; height: 8px; background: #f97316; border-radius: 4px 4px 0 0; z-index: 3; box-shadow: 0 0 8px #f97316; }
+    .tiny-rov-dome { position: absolute; top: 30%; left: 50%; transform: translate(-50%, -50%) translateZ(15px); width: 14px; height: 14px; background: #38bdf8; border-radius: 50%; z-index: 4; border: 2px solid #0f172a; box-shadow: inset -2px -2px 4px rgba(0,0,0,0.5); }
+    .tiny-rov-prop { position: absolute; width: 10px; height: 16px; background: #334155; border-radius: 4px; z-index: 1; border: 1px solid #475569; }
+    .tiny-rov-prop.tl { top: 0px; left: -6px; }
+    .tiny-rov-prop.tr { top: 0px; right: -6px; }
+    .tiny-rov-prop.bl { bottom: 0px; left: -6px; }
+    .tiny-rov-prop.br { bottom: 0px; right: -6px; }
+
+    .rov-map-container { display: flex; justify-content: center; padding: 15px 0; }
+    .rov-hull { width: 120px; height: 180px; border: 2px solid #475569; border-radius: 20px; position: relative; background: rgba(15, 23, 42, 0.5); }
+    .rov-nose { position: absolute; top: -10px; left: 50%; transform: translateX(-50%); width: 40px; height: 10px; background: #f97316; border-radius: 5px 5px 0 0; z-index: 3; box-shadow: 0 0 10px #f97316; }
+    .thruster-node { position: absolute; width: 24px; height: 36px; background: #334155; border-radius: 6px; border: 2px solid #1e293b; transition: background-color 0.1s linear, box-shadow 0.1s linear; display: flex; align-items: center; justify-content: center; font-size: 9px; font-weight: bold; color: rgba(255,255,255,0.4); }
+    .node-fl { top: -10px; left: -15px; transform: rotate(-45deg); }
+    .node-fr { top: -10px; right: -15px; transform: rotate(45deg); }
+    .node-rl { bottom: -10px; left: -15px; transform: rotate(45deg); }
+    .node-rr { bottom: -10px; right: -15px; transform: rotate(-45deg); }
+    .node-vl { top: 50%; left: -18px; transform: translateY(-50%); border-radius: 50%; width: 30px; height: 30px; }
+    .node-vr { top: 50%; right: -18px; transform: translateY(-50%); border-radius: 50%; width: 30px; height: 30px; }
+    .pwm-label { position: absolute; font-size: 8px; font-family: monospace; font-weight: bold; color: #94a3b8; white-space: nowrap; }
+    #pwmFL { top: 8px; left: 6px; }
+    #pwmFR { top: 8px; right: 6px; }
+    #pwmRL { bottom: 8px; left: 6px; }
+    #pwmRR { bottom: 8px; right: 6px; }
+    #pwmVL { top: 50%; left: 6px; transform: translateY(-50%); }
+    #pwmVR { top: 50%; right: 6px; transform: translateY(-50%); }
+
+    .box-grid { display: grid; gap: 10px; }
+    .box-grid-2x2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .box-grid-3x2 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .value-box { background: #08111f; border: 1px solid #23314c; border-radius: 10px; padding: 10px; min-height: 60px; text-align: center; }
+    .value-box .value { font-size: 18px; font-weight: 700; color: #38bdf8; font-family: Consolas, monospace; margin-top: 4px;}
+    .camera-grid { display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: repeat(2, minmax(120px, 1fr)); gap: 8px; height: 100%; min-height: 0; }
+    .video-box { background: #000; border: 2px solid #475569; border-radius: 4px; display: flex; align-items: center; justify-content: center; position: relative; color: #475569; font-weight: bold; font-size: 12px; min-height: 120px; }
+    .cam-tag { position: absolute; top: 8px; left: 8px; background: rgba(0,0,0,0.7); font-size: 10px; padding: 3px 8px; color: #38bdf8; border-radius: 2px; }
+    .camera-column { display: flex; flex-direction: column; min-height: 0; }
+    .compass { width: 100px; height: 100px; border: 3px solid #38bdf8; border-radius: 50%; position: relative; margin: 8px auto; background: #000; overflow: hidden; }
+    .yaw-needle { width: 4px; height: 38px; background: #ef4444; position: absolute; left: 50%; bottom: 50%; transform-origin: bottom center; transition: transform 0.05s linear; }
+    .horizon-wrap { width: 100%; height: 100%; position: absolute; top: 0; left: 0; overflow: hidden; border-radius: 50%; }
+    .horizon-line { width: 90%; height: 2px; background: #22c55e; position: absolute; top: 50%; left: 50%; transform-origin: center center; transition: transform 0.05s linear; }
+    h3 { font-size: 11px; margin: 0 0 8px 0; color: #38bdf8; text-transform: uppercase; letter-spacing: 1px; border-bottom: 1px solid #334155; padding-bottom: 4px; }
+    .label { font-size: 10px; color: #94a3b8; text-transform: uppercase; }
+    .val-num { font-family: monospace; font-size: 18px; color: #38bdf8; font-weight: bold; }
+    #conn { font-weight: bold; margin-left: 6px; }
+    .dir-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 5px; margin-top: 5px; }
+    .dir-btn { padding: 4px; font-size: 10px; cursor: pointer; border: 1px solid #334155; border-radius: 3px; background: #334155; color: white; }
+    .sel-btn { padding: 4px; font-size: 10px; cursor: pointer; border: 1px solid #334155; border-radius: 3px; background: #334155; color: white; font-weight: bold; }
+
+    .arm-container { margin-top: 5px; }
+    .arm-section { margin-bottom: 12px; }
+    .arm-section-title { font-size: 10px; color: #38bdf8; font-weight: bold; margin-bottom: 6px; display: block; }
+    .arm-slider-row { display: flex; align-items: center; gap: 6px; margin-bottom: 5px; }
+    .arm-slider-label { font-size: 9px; color: #94a3b8; width: 60px; text-transform: uppercase; flex-shrink: 0; }
+    .arm-slider { flex: 1; height: 20px; -webkit-appearance: none; appearance: none; background: #08111f; border-radius: 3px; border: 1px solid #334155; outline: none; }
+    .arm-slider::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 14px; height: 14px; border-radius: 50%; background: #facc15; cursor: pointer; border: 2px solid #f97316; }
+    .arm-slider::-moz-range-thumb { width: 14px; height: 14px; border-radius: 50%; background: #facc15; cursor: pointer; border: 2px solid #f97316; }
+    .arm-slider-value { font-size: 9px; font-family: Consolas, monospace; color: #facc15; width: 45px; text-align: right; flex-shrink: 0; }
+    .gripper-controls { display: flex; gap: 5px; }
+    .gripper-controls button { background: #334155; border: 1px solid #475569; color: white; padding: 8px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: bold; }
+    .gripper-controls button.active { background: #38bdf8; border-color: #38bdf8; box-shadow: 0 0 8px #38bdf8; }
+
+    /* ====== SETTINGS BUTTON ====== */
+    .settings-btn { position: fixed; bottom: 16px; right: 16px; z-index: 100; background: #1e293b; border: 1px solid #334155; color: #94a3b8; padding: 7px 14px; border-radius: 6px; cursor: pointer; font-size: 11px; letter-spacing: 1px; }
+    .settings-btn:hover { border-color: #38bdf8; color: #38bdf8; }
+
+    /* ====== SETTINGS MODAL ====== */
+    .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 200; align-items: flex-start; justify-content: center; padding: 20px; overflow-y: auto; }
+    .modal-overlay.open { display: flex; }
+    .modal { background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 0; width: 620px; max-width: 100%; overflow: hidden; }
+
+    /* Settings tabs */
+    .modal-tabs { display: flex; border-bottom: 1px solid #334155; }
+    .modal-tab { flex: 1; padding: 12px 8px; font-size: 11px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; cursor: pointer; background: transparent; border: none; color: #64748b; border-bottom: 2px solid transparent; margin-bottom: -1px; transition: color 0.15s, border-color 0.15s; }
+    .modal-tab:hover { color: #94a3b8; }
+    .modal-tab.active { color: #38bdf8; border-bottom-color: #38bdf8; }
+
+    .modal-body { padding: 20px; max-height: 70vh; overflow-y: auto; }
+    .modal-title { font-size: 12px; color: #38bdf8; text-transform: uppercase; letter-spacing: 2px; margin: 0 0 4px 0; }
+    .modal-hint { font-size: 10px; color: #475569; margin: 0 0 14px 0; }
+
+    /* Tab panels */
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+
+    /* Axis inversion rows */
+    .invert-section-title { font-size: 10px; color: #64748b; text-transform: uppercase; letter-spacing: 1px; margin: 14px 0 6px 0; padding-bottom: 4px; border-bottom: 1px solid #1e3a4a; }
+    .invert-row { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid #0f172a; }
+    .invert-label { flex: 1; font-size: 11px; color: #94a3b8; }
+    .invert-desc { font-size: 10px; color: #475569; width: 180px; }
+    .toggle-btn { width: 80px; padding: 5px 10px; font-size: 10px; font-weight: bold; text-transform: uppercase; border-radius: 4px; border: 1px solid #475569; background: #334155; color: #94a3b8; cursor: pointer; transition: all 0.15s; text-align: center; letter-spacing: 0.5px; }
+    .toggle-btn.reversed { background: #ef4444; border-color: #ef4444; color: #fff; box-shadow: 0 0 8px rgba(239,68,68,0.4); }
+    .toggle-btn.normal { background: #22c55e; border-color: #22c55e; color: #000; box-shadow: 0 0 8px rgba(34,197,94,0.3); }
+
+    /* Bindings */
+    .binding-section { font-size: 10px; color: #64748b; text-transform: uppercase; letter-spacing: 1px; margin: 12px 0 4px 0; }
+    .binding-row { display: flex; align-items: center; gap: 10px; padding: 7px 0; border-bottom: 1px solid #0f172a; }
+    .binding-label { flex: 1; font-size: 11px; color: #94a3b8; }
+    .binding-value { font-family: Consolas, monospace; font-size: 11px; color: #facc15; width: 110px; text-align: center; background: #0f172a; padding: 3px 6px; border-radius: 4px; border: 1px solid #1e3a4a; }
+    .binding-value.listening { color: #f97316; border-color: #f97316; animation: blink 0.7s infinite; }
+    @keyframes blink { 0%,100% { opacity:1; } 50% { opacity:0.35; } }
+    .remap-btn { background: #334155; border: 1px solid #475569; color: #f8fafc; padding: 3px 10px; border-radius: 4px; cursor: pointer; font-size: 10px; white-space: nowrap; }
+    .remap-btn:hover { border-color: #38bdf8; }
+    .remap-btn.active { background: #f97316; border-color: #f97316; }
+
+    .modal-footer { display: flex; gap: 10px; padding: 14px 20px; border-top: 1px solid #334155; justify-content: flex-end; background: #1a2744; }
+    .modal-footer button { padding: 6px 16px; border-radius: 5px; border: 1px solid #334155; background: #0f172a; color: #f8fafc; cursor: pointer; font-size: 11px; }
+    .modal-close-btn { border-color: #38bdf8 !important; color: #38bdf8 !important; }
+    .modal-reset-btn { color: #ef4444 !important; border-color: #ef4444 !important; }
+    .modal-save-btn { border-color: #22c55e !important; color: #22c55e !important; }
+
+    /* Info note */
+    .info-note { background: #0f172a; border: 1px solid #1e3a4a; border-radius: 6px; padding: 8px 12px; font-size: 10px; color: #475569; margin-bottom: 14px; line-height: 1.5; }
+    .info-note span { color: #38bdf8; }
+  </style>
+</head>
+<body>
+  <div class="main-layout">
+    <div class="column left-column">
+      <div class="card">
+        <h3>SYSTEM MODIFIERS</h3>
+        <div id="gainModeTag" style="text-align:center;padding:4px 8px;margin-bottom:8px;border-radius:4px;font-size:10px;font-weight:bold;letter-spacing:1px;border:1px solid #38bdf8;color:#38bdf8;background:rgba(56,189,248,0.1);">EDITING: PRIMARY + SECONDARY</div>
+        <div class="box-grid box-grid-2x2">
+          <div class="value-box" id="gainBoxPrimary" style="border-color:#38bdf8;">
+            <div class="label">Primary</div>
+            <div class="value" id="valGain" style="color:#38bdf8;">50%</div>
+          </div>
+          <div class="value-box" id="gainBoxSecondary" style="border-color:#a78bfa;">
+            <div class="label">Secondary</div>
+            <div class="value" id="valVGain" style="color:#a78bfa;">50%</div>
+          </div>
+          <div class="value-box" id="gainBoxSway" style="border-color:#334155;">
+            <div class="label">Sway</div>
+            <div class="value" id="valSwayGain" style="color:#94a3b8;">50%</div>
+          </div>
+          <div class="value-box" id="gainBoxYaw" style="border-color:#334155;">
+            <div class="label">Yaw</div>
+            <div class="value" id="valYawGain" style="color:#94a3b8;">50%</div>
+          </div>
+          <div class="value-box" style="border-color:#22c55e;grid-column:span 2;">
+            <div class="label">Roll</div>
+            <div class="value" id="valRollGain" style="color:#22c55e;">50%</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>6-DOF TELEMETRY (RAW)</h3>
+        <div class="box-grid box-grid-3x2">
+          <div class="value-box"><div class="label">Surge (Y)</div><div class="value" id="valSurge">0%</div></div>
+          <div class="value-box"><div class="label">Sway (X)</div><div class="value" id="valSway">0%</div></div>
+          <div class="value-box"><div class="label">Heave (Z)</div><div class="value" id="valHeave">0%</div></div>
+          <div class="value-box"><div class="label">Yaw</div><div class="value" id="valYaw">0%</div></div>
+          <div class="value-box"><div class="label">Pitch</div><div class="value" id="valPitch">0%</div></div>
+          <div class="value-box"><div class="label">Roll</div><div class="value" id="valRoll">0%</div></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>FLIGHT CONTROLS</h3>
+        <div class="dual-gimbals">
+          <div class="gimbal-wrap">
+            <div class="gimbal-label">Sway / Surge</div>
+            <div class="trackpad" id="trackpad">
+              <div class="joystick-dot" id="leftStick"></div>
+            </div>
+          </div>
+          <div class="gimbal-wrap">
+            <div class="gimbal-label">Yaw (Rotate) / Heave (Up)</div>
+            <div class="heave-yaw-display">
+              <div class="tiny-rov" id="rightStickROV">
+                <div class="tiny-rov-body">
+                   <div class="tiny-rov-dome"></div>
+                </div>
+                <div class="tiny-rov-nose"></div>
+                <div class="tiny-rov-prop tl"></div>
+                <div class="tiny-rov-prop tr"></div>
+                <div class="tiny-rov-prop bl"></div>
+                <div class="tiny-rov-prop br"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>ARM CONTROLS</h3>
+        <div class="arm-container">
+          <div class="arm-section">
+            <span class="arm-section-title">Arm 1</span>
+            <div class="arm-slider-row">
+              <div class="arm-slider-label">Slew</div>
+              <input class="arm-slider" type="range" min="1000" max="2000" value="1500" id="arm1_slew">
+              <div class="arm-slider-value" id="arm1_slew_val">1500</div>
+            </div>
+            <div class="arm-slider-row">
+              <div class="arm-slider-label">Shoulder</div>
+              <input class="arm-slider" type="range" min="1000" max="2000" value="1500" id="arm1_shoulder">
+              <div class="arm-slider-value" id="arm1_shoulder_val">1500</div>
+            </div>
+            <div class="arm-slider-row">
+              <div class="arm-slider-label">Rotate</div>
+              <input class="arm-slider" type="range" min="1000" max="2000" value="1500" id="arm1_rotate">
+              <div class="arm-slider-value" id="arm1_rotate_val">1500</div>
+            </div>
+            <div class="arm-slider-row">
+              <div class="arm-slider-label">Gripper</div>
+              <div class="gripper-controls">
+                <button id="arm1_gripper_close">Close</button>
+                <button id="arm1_gripper_open">Open</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="arm-section">
+            <span class="arm-section-title">Arm 2</span>
+            <div class="arm-slider-row">
+              <div class="arm-slider-label">Slew</div>
+              <input class="arm-slider" type="range" min="1000" max="2000" value="1500" id="arm2_slew">
+              <div class="arm-slider-value" id="arm2_slew_val">1500</div>
+            </div>
+            <div class="arm-slider-row">
+              <div class="arm-slider-label">Shoulder</div>
+              <input class="arm-slider" type="range" min="1000" max="2000" value="1500" id="arm2_shoulder">
+              <div class="arm-slider-value" id="arm2_shoulder_val">1500</div>
+            </div>
+            <div class="arm-slider-row">
+              <div class="arm-slider-label">Rotate</div>
+              <input class="arm-slider" type="range" min="1000" max="2000" value="1500" id="arm2_rotate">
+              <div class="arm-slider-value" id="arm2_rotate_val">1500</div>
+            </div>
+            <div class="arm-slider-row">
+              <div class="arm-slider-label">Gripper</div>
+              <div class="gripper-controls">
+                <button id="arm2_gripper_close">Close</button>
+                <button id="arm2_gripper_open">Open</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="camera-column">
+      <div class="camera-grid">
+        <div class="video-box" style="padding:0;overflow:hidden;">
+          <span class="cam-tag">CAM 1</span>
+          <img src="/cam1" style="width:100%;height:100%;object-fit:cover;" alt="CAM 1"
+               onerror="this.style.display='none';this.nextElementSibling.style.display='block'"
+               onload="this.style.display='block';this.nextElementSibling.style.display='none'">
+          <span id="cam1Label">NO SIGNAL</span>
+        </div>
+        <div class="video-box"><span class="cam-tag">CAM 2</span>NO SIGNAL</div>
+        <div class="video-box"><span class="cam-tag">CAM 3</span>NO SIGNAL</div>
+        <div class="video-box"><span class="cam-tag">CAM 4</span>NO SIGNAL</div>
+      </div>
+    </div>
+
+    <div class="column right-column">
+      <div class="card" style="text-align:center;">
+        <h3>ORIENTATION</h3>
+        <div class="label">STATUS <span id="conn">DISCONNECTED</span></div>
+        <div class="compass"><div class="yaw-needle" id="yaw-needle"></div></div>
+        <div style="font-size:11px; margin-top:3px;">YAW: <span id="yv">0.0</span>°</div>
+        <div class="label" style="margin-top:10px;">PITCH & ROLL</div>
+        <div class="compass" style="border-color:#22c55e;">
+          <div class="horizon-wrap"><div class="horizon-line" id="pr-line"></div></div>
+        </div>
+        <div style="font-size:11px; margin-top:5px;">P: <span id="pv">0</span>° | R: <span id="rv">0</span>°</div>
+      </div>
+
+      <div class="card">
+        <div class="card">
+          <h3>DOF MODE</h3>
+          <div class="dir-grid" id="dof-mode-grid">
+            <button class="sel-btn" id="mbtn-surge" onclick="setMode('surge')">SURGE</button>
+            <button class="sel-btn" id="mbtn-sway"  onclick="setMode('sway')">SWAY</button>
+            <button class="sel-btn" id="mbtn-heave" onclick="setMode('heave')">HEAVE</button>
+            <button class="sel-btn" id="mbtn-yaw"   onclick="setMode('yaw')">YAW</button>
+            <button class="sel-btn" id="mbtn-pitch" onclick="setMode('pitch')">PITCH</button>
+            <button class="sel-btn" id="mbtn-roll"  onclick="setMode('roll')">ROLL</button>
+          </div>
+        </div>
+        <div class="card">
+          <h3>HOLD MODES</h3>
+          <div style="display:flex; flex-direction:column; gap:5px; margin-top:5px;">
+            <button class="sel-btn" id="hbtn-depth"     onclick="setHoldMode('depth')">DEPTH HOLD</button>
+            <button class="sel-btn" id="hbtn-roll"      onclick="setHoldMode('roll')">ROLL HOLD</button>
+            <button class="sel-btn" id="hbtn-stabilize" onclick="setHoldMode('stabilize')">STABILIZE</button>
+          </div>
+        </div>
+        <h3>LIVE THRUSTER MAP</h3>
+        <div class="rov-map-container">
+          <div class="rov-hull">
+            <div class="rov-nose"></div>
+            <div class="thruster-node node-fl" id="visFL">FL</div>
+            <div class="thruster-node node-fr" id="visFR">FR</div>
+            <div class="thruster-node node-rl" id="visRL">RL</div>
+            <div class="thruster-node node-rr" id="visRR">RR</div>
+            <div class="thruster-node node-vl" id="visVL">VL</div>
+            <div class="thruster-node node-vr" id="visVR">VR</div>
+            <span class="pwm-label" id="pwmFL">1500</span>
+            <span class="pwm-label" id="pwmFR">1500</span>
+            <span class="pwm-label" id="pwmRL">1500</span>
+            <span class="pwm-label" id="pwmRR">1500</span>
+            <span class="pwm-label" id="pwmVL">1500</span>
+            <span class="pwm-label" id="pwmVR">1500</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>SENSORS</h3>
+        <div class="label">Depth</div>
+        <div class="val-num" id="depth">0.00 m</div>
+        <div class="label" style="margin-top:10px;">Network</div>
+        <div style="color:#22c55e; font-weight:bold;"><span id="ping">0</span> ms</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Settings button -->
+  <button class="settings-btn" onclick="openSettings()">⚙ SETTINGS</button>
+
+  <!-- ========== UNIFIED SETTINGS MODAL ========== -->
+  <div class="modal-overlay" id="settingsModal">
+    <div class="modal">
+      <!-- Tabs -->
+      <div class="modal-tabs">
+        <button class="modal-tab active" onclick="switchTab('tab-axes')">🎮 Axis Config</button>
+        <button class="modal-tab" onclick="switchTab('tab-bindings')">🔗 Bindings</button>
+        <button class="modal-tab" onclick="switchTab('tab-calib')">🔧 Calibration</button>
+      </div>
+
+      <div class="modal-body">
+
+        <!-- ===== TAB: AXIS CONFIG ===== -->
+        <div class="tab-panel active" id="tab-axes">
+          <div class="info-note">
+            Use these toggles to <span>reverse</span> the direction of each control axis. This is applied after gain scaling and does not affect thruster calibration.
+          </div>
+
+          <div class="invert-section-title">Flight Axes</div>
+
+          <div class="invert-row">
+            <div class="invert-label">Surge (Forward / Back)</div>
+            <div class="invert-desc">Gamepad Y axis → forward thrust</div>
+            <button class="toggle-btn normal" id="inv-surge" onclick="toggleInvert('surge')">NORMAL</button>
+          </div>
+          <div class="invert-row">
+            <div class="invert-label">Sway (Left / Right)</div>
+            <div class="invert-desc">Gamepad X axis → lateral thrust</div>
+            <button class="toggle-btn normal" id="inv-sway" onclick="toggleInvert('sway')">NORMAL</button>
+          </div>
+          <div class="invert-row">
+            <div class="invert-label">Heave (Up / Down)</div>
+            <div class="invert-desc">Throttle axis → vertical thrust</div>
+            <button class="toggle-btn normal" id="inv-heave" onclick="toggleInvert('heave')">NORMAL</button>
+          </div>
+          <div class="invert-row">
+            <div class="invert-label">Yaw (Rotate CW / CCW)</div>
+            <div class="invert-desc">Yaw axis → rotation direction</div>
+            <button class="toggle-btn normal" id="inv-yaw" onclick="toggleInvert('yaw')">NORMAL</button>
+          </div>
+
+          <div class="invert-section-title">Orientation / Pitch-Roll Mode</div>
+
+          <div class="invert-row">
+            <div class="invert-label">Pitch (Nose Up / Down)</div>
+            <div class="invert-desc">When trigger held → pitch control</div>
+            <button class="toggle-btn normal" id="inv-pitch" onclick="toggleInvert('pitch')">NORMAL</button>
+          </div>
+          <div class="invert-row">
+            <div class="invert-label">Roll (Bank Left / Right)</div>
+            <div class="invert-desc">When trigger held → roll control</div>
+            <button class="toggle-btn normal" id="inv-roll" onclick="toggleInvert('roll')">NORMAL</button>
+          </div>
+
+          <div class="invert-section-title">Hold Mode Directions</div>
+
+          <div class="invert-row">
+            <div class="invert-label">Depth Hold</div>
+            <div class="invert-desc">Reverse vertical correction direction</div>
+            <button class="toggle-btn normal" id="inv-depthHoldDir" onclick="toggleInvert('depthHoldDir')">NORMAL</button>
+          </div>
+          <div class="invert-row">
+            <div class="invert-label">Roll Hold</div>
+            <div class="invert-desc">Reverse roll leveling direction</div>
+            <button class="toggle-btn normal" id="inv-rollHoldDir" onclick="toggleInvert('rollHoldDir')">NORMAL</button>
+          </div>
+
+          <div class="invert-section-title">Arm 1</div>
+
+          <div class="invert-row">
+            <div class="invert-label">Slew</div>
+            <div class="invert-desc">Arm 1 left / right rotation</div>
+            <button class="toggle-btn normal" id="inv-arm1Slew" onclick="toggleInvert('arm1Slew')">NORMAL</button>
+          </div>
+          <div class="invert-row">
+            <div class="invert-label">Shoulder</div>
+            <div class="invert-desc">Arm 1 up / down</div>
+            <button class="toggle-btn normal" id="inv-arm1Shoulder" onclick="toggleInvert('arm1Shoulder')">NORMAL</button>
+          </div>
+          <div class="invert-row">
+            <div class="invert-label">Rotate</div>
+            <div class="invert-desc">Arm 1 wrist rotation</div>
+            <button class="toggle-btn normal" id="inv-arm1Rotate" onclick="toggleInvert('arm1Rotate')">NORMAL</button>
+          </div>
+          <div class="invert-row">
+            <div class="invert-label">Gripper</div>
+            <div class="invert-desc">Arm 1 swap close / open</div>
+            <button class="toggle-btn normal" id="inv-arm1Gripper" onclick="toggleInvert('arm1Gripper')">NORMAL</button>
+          </div>
+
+          <div class="invert-section-title">Arm 2</div>
+
+          <div class="invert-row">
+            <div class="invert-label">Slew</div>
+            <div class="invert-desc">Arm 2 left / right rotation</div>
+            <button class="toggle-btn normal" id="inv-arm2Slew" onclick="toggleInvert('arm2Slew')">NORMAL</button>
+          </div>
+          <div class="invert-row">
+            <div class="invert-label">Shoulder</div>
+            <div class="invert-desc">Arm 2 up / down</div>
+            <button class="toggle-btn normal" id="inv-arm2Shoulder" onclick="toggleInvert('arm2Shoulder')">NORMAL</button>
+          </div>
+          <div class="invert-row">
+            <div class="invert-label">Rotate</div>
+            <div class="invert-desc">Arm 2 wrist rotation</div>
+            <button class="toggle-btn normal" id="inv-arm2Rotate" onclick="toggleInvert('arm2Rotate')">NORMAL</button>
+          </div>
+          <div class="invert-row">
+            <div class="invert-label">Gripper</div>
+            <div class="invert-desc">Arm 2 swap close / open</div>
+            <button class="toggle-btn normal" id="inv-arm2Gripper" onclick="toggleInvert('arm2Gripper')">NORMAL</button>
+          </div>
+        </div>
+
+        <!-- ===== TAB: BINDINGS ===== -->
+        <div class="tab-panel" id="tab-bindings">
+          <p class="modal-hint">Click REMAP, then move the axis or press the button on your controller to assign it.</p>
+          <div id="bindingsList"></div>
+        </div>
+
+        <!-- ===== TAB: CALIBRATION ===== -->
+        <div class="tab-panel" id="tab-calib">
+          <p class="modal-hint">Select thrusters to test individually. Toggle N/R to reverse. SAVE persists to disk.</p>
+          <div class="dir-grid" id="dir-grid"></div>
+          <button onclick="saveCalibration()" id="calibSaveBtn" style="margin-top:6px; width:100%; padding:5px; font-size:11px; background:#1d4ed8; color:#fff; border:none; border-radius:4px; cursor:pointer;">SAVE</button>
+        </div>
+
+      </div><!-- /modal-body -->
+
+      <div class="modal-footer">
+        <button class="modal-reset-btn" onclick="resetCurrentTab()">Reset Defaults</button>
+        <button class="modal-save-btn" onclick="saveToDisk()">Save to Disk</button>
+        <button class="modal-close-btn" onclick="closeSettings()">Close</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+  const socket = io();
+  const dirGrid = document.getElementById('dir-grid');
+
+  [1, 2, 3, 4, 5, 6].forEach(id => {
+    dirGrid.innerHTML += `<button onclick="toggleSelection(${id})" class="sel-btn" id="sbtn-${id}">T${id}</button><button onclick="socket.emit('toggle-direction', ${id})" class="dir-btn" id="dbtn-${id}">N</button>`;
+  });
+
+  const thrusterSelected = {1:false,2:false,3:false,4:false,5:false,6:false};
+
+  function toggleSelection(id) { socket.emit('toggle-selection', id); }
+
+  socket.on('selection-update', (data) => {
+    thrusterSelected[data.id] = data.selected;
+    const btn = document.getElementById(`sbtn-${data.id}`);
+    btn.style.background = data.selected ? '#22c55e' : '#334155';
+    btn.style.color = data.selected ? '#000' : '#fff';
+  });
+
+  socket.on('direction-update', (data) => {
+    const btn = document.getElementById(`dbtn-${data.id}`);
+    btn.innerText = data.dir === 1 ? 'N' : 'R';
+    btn.style.background = data.dir === 1 ? '#334155' : '#ef4444';
+  });
+
+  socket.on('calibration-state', ({ dirs, selected }) => {
+    for (let id = 1; id <= 6; id++) {
+      const dBtn = document.getElementById(`dbtn-${id}`);
+      const sBtn = document.getElementById(`sbtn-${id}`);
+      if (dBtn) { dBtn.innerText = dirs[id] === 1 ? 'N' : 'R'; dBtn.style.background = dirs[id] === 1 ? '#334155' : '#ef4444'; }
+      if (sBtn) { sBtn.style.background = selected[id] ? '#22c55e' : '#334155'; sBtn.style.color = selected[id] ? '#000' : '#fff'; thrusterSelected[id] = selected[id]; }
+    }
+  });
+
+  function saveCalibration() { socket.emit('save-calibration'); }
+  socket.on('calibration-saved', () => {
+    const btn = document.getElementById('calibSaveBtn');
+    btn.innerText = 'SAVED ✓';
+    setTimeout(() => btn.innerText = 'SAVE', 1500);
+  });
+
+  socket.on('arm-update', (data) => {
+    const ids = ['arm1_slew','arm1_shoulder','arm1_rotate','arm2_slew','arm2_shoulder','arm2_rotate'];
+    ids.forEach((id) => {
+      if (data[id] !== undefined) {
+        const val = Number(data[id]);
+        const slider = document.getElementById(id);
+        const label  = document.getElementById(id + '_val');
+        if (!slider || !label) return;
+        slider.value = val;
+        label.textContent = val;
+      }
+    });
+
+    const arm1GripperClose = document.getElementById('arm1_gripper_close');
+    const arm1GripperOpen  = document.getElementById('arm1_gripper_open');
+    if (data.arm1_gripper === 1) { arm1GripperClose.classList.add('active'); arm1GripperOpen.classList.remove('active'); }
+    else if (data.arm1_gripper === 2) { arm1GripperClose.classList.remove('active'); arm1GripperOpen.classList.add('active'); }
+    else { arm1GripperClose.classList.remove('active'); arm1GripperOpen.classList.remove('active'); }
+
+    const arm2GripperClose = document.getElementById('arm2_gripper_close');
+    const arm2GripperOpen  = document.getElementById('arm2_gripper_open');
+    if (data.arm2_gripper === 1) { arm2GripperClose.classList.add('active'); arm2GripperOpen.classList.remove('active'); }
+    else if (data.arm2_gripper === 2) { arm2GripperClose.classList.remove('active'); arm2GripperOpen.classList.add('active'); }
+    else { arm2GripperClose.classList.remove('active'); arm2GripperOpen.classList.remove('active'); }
+  });
+
+  let yawAccum = 0; let lastYaw = null; let gpIndex = null;
+  let pixhawkTimeout = null;
+
+  socket.on('disconnect', () => {
+    clearTimeout(pixhawkTimeout);
+    const connEl = document.getElementById('conn');
+    connEl.innerText = 'DISCONNECTED';
+    connEl.style.color = '#f87171';
+  });
+
+  socket.on('robot-data', (data) => {
+    const yaw = Number(data.yaw) || 0;
+    const pitch = Number(data.pitch) || 0;
+    const roll = Number(data.roll) || 0;
+
+    if (data.pixhawkLive) {
+      const connEl = document.getElementById('conn');
+      connEl.innerText = 'CONNECTED';
+      connEl.style.color = '#22c55e';
+      clearTimeout(pixhawkTimeout);
+      pixhawkTimeout = setTimeout(() => {
+        connEl.innerText = 'DISCONNECTED';
+        connEl.style.color = '#f87171';
+      }, 3000);
+    }
+
+    if (lastYaw === null) yawAccum = yaw;
+    else {
+      let delta = yaw - lastYaw;
+      if (delta > 180) delta -= 360;
+      if (delta < -180) delta += 360;
+      yawAccum += delta;
+    }
+    lastYaw = yaw;
+    const pitchMove = Math.max(-18, Math.min(18, pitch * -2));
+
+    document.getElementById('yaw-needle').style.transform = `translateX(-50%) rotate(${yawAccum - 90}deg)`;
+    document.getElementById('pr-line').style.transform = `translate(-50%, ${pitchMove}px) rotate(${roll}deg)`;
+    document.getElementById('yv').innerText = yawAccum.toFixed(1);
+    document.getElementById('pv').innerText = pitch.toFixed(1);
+    document.getElementById('rv').innerText = roll.toFixed(1);
+    document.getElementById('depth').innerText = ((data.depth ?? 0).toFixed ? (data.depth ?? 0).toFixed(2) : '0.00') + ' m';
+    document.getElementById('ping').innerText = Math.round(data.ping ?? 0);
+
+    latestRollDeg = roll;
+    latestDepth   = Number(data.depth) || 0;
+  });
+
+  const leftStick = document.getElementById('leftStick');
+  const rightStickRov = document.getElementById('rightStickROV');
+
+  const visNodes = {
+    FL: document.getElementById('visFL'), FR: document.getElementById('visFR'),
+    RL: document.getElementById('visRL'), RR: document.getElementById('visRR'),
+    VL: document.getElementById('visVL'), VR: document.getElementById('visVR')
+  };
+
+  let nx = 0, ny = 0, yawNorm = 0, verticalNorm = 0;
+  let primaryGain = 0.50, secondaryGain = 0.50, currentPitch = 0, currentRoll = 0;
+  let swayGain = 0.50, yawGain = 0.50, rollGain = 0.50;
+  let gainMode = 'primary-secondary'; // 'primary-secondary' | 'sway-yaw'
+  let prevHatX = 0, prevHatY = 0;
+  let gainUpWas = false, gainDownWas = false, vgUpWas = false, vgDownWas = false;
+  let modeSurgeWas=false, modeSwayWas=false, modeHeaveWas=false,
+      modeYawWas=false, modePitchWas=false, modeRollWas=false;
+  let depthHoldWas=false, rollHoldWas=false, stabilizeWas=false;
+
+  let offsetX = 0, offsetY = 0, offsetYaw = 0, offsetThrottle = 0;
+  let btn8WasPressed = false;
+
+  const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
+  const mixToPwm = (v) => Math.round(clamp(1500 + v * 400, 1100, 1900));
+
+  /* ============ AXIS INVERSION ============ */
+  const DEFAULT_INVERT = {
+    surge: false, sway: false, heave: false, yaw: false, pitch: false, roll: false,
+    depthHoldDir: false, rollHoldDir: false,
+    arm1Slew: false, arm1Shoulder: false, arm1Rotate: false, arm1Gripper: false,
+    arm2Slew: false, arm2Shoulder: false, arm2Rotate: false, arm2Gripper: false
+  };
+  let axisInvert = JSON.parse(localStorage.getItem('axisInvert') || 'null') || { ...DEFAULT_INVERT };
+
+  function saveInvert() { localStorage.setItem('axisInvert', JSON.stringify(axisInvert)); }
+
+  function toggleInvert(axis) {
+    axisInvert[axis] = !axisInvert[axis];
+    saveInvert();
+    renderInvertButtons();
+  }
+
+  function renderInvertButtons() {
+    for (const axis of Object.keys(DEFAULT_INVERT)) {
+      const btn = document.getElementById(`inv-${axis}`);
+      if (btn) {
+        btn.textContent = axisInvert[axis] ? 'REVERSED' : 'NORMAL';
+        btn.className = axisInvert[axis] ? 'toggle-btn reversed' : 'toggle-btn normal';
+      }
+    }
+  }
+
+  function applyInvert(value, axis) {
+    return axisInvert[axis] ? -value : value;
+  }
+
+  function applyInvertPwm(pwm, axis) {
+    return axisInvert[axis] ? (3000 - pwm) : pwm;
+  }
+
+  function applyInvertGripper(state, axis) {
+    if (!axisInvert[axis] || state === 0) return state;
+    return state === 1 ? 2 : 1;
+  }
+
+  /* ============ DOF MODE ============ */
+  let activeModes = new Set();
+  const DOF_MODES = ['surge','sway','heave','yaw','pitch','roll'];
+
+  function setMode(mode) {
+    if (activeModes.has(mode)) { activeModes.delete(mode); } else { activeModes.add(mode); }
+    DOF_MODES.forEach(m => {
+      const btn = document.getElementById(`mbtn-${m}`);
+      if (btn) {
+        btn.style.background = activeModes.has(m) ? '#f59e0b' : '#334155';
+        btn.style.color      = activeModes.has(m) ? '#000'    : '#fff';
+      }
+    });
+  }
+
+  /* ============ HOLD MODES ============ */
+  const DEPTH_HOLD_KP = 1.5;  // m^-1: 0.67 m error → full vertical thrust
+  const ROLL_HOLD_KP  = 0.02; // deg^-1: 50° error → full roll correction
+
+  let depthHoldActive = false, depthHoldTarget = 0;
+  let rollHoldActive  = false, rollHoldTarget  = 0;
+  let stabilizeActive = false;
+
+  let latestDepth   = 0;
+  let latestRollDeg = 0;
+  let depthCorrection = 0;
+  let rollCorrection  = 0;
+
+  function setHoldMode(mode) {
+    if (mode === 'depth') {
+      depthHoldActive = !depthHoldActive;
+      if (depthHoldActive) { depthHoldTarget = latestDepth; stabilizeActive = false; }
+      else depthCorrection = 0;
+    } else if (mode === 'roll') {
+      rollHoldActive = !rollHoldActive;
+      if (rollHoldActive) { stabilizeActive = false; }
+      else rollCorrection = 0;
+    } else if (mode === 'stabilize') {
+      stabilizeActive = !stabilizeActive;
+      if (stabilizeActive) {
+        depthHoldActive = true;  depthHoldTarget = latestDepth;
+        rollHoldActive  = true;
+      } else {
+        depthHoldActive = false; depthCorrection = 0;
+        rollHoldActive  = false; rollCorrection  = 0;
+      }
+    }
+    renderHoldButtons();
+  }
+
+  function renderHoldButtons() {
+    const states = {
+      'hbtn-depth':     depthHoldActive,
+      'hbtn-roll':      rollHoldActive,
+      'hbtn-stabilize': stabilizeActive,
+    };
+    for (const [id, active] of Object.entries(states)) {
+      const btn = document.getElementById(id);
+      if (btn) { btn.style.background = active ? '#3b82f6' : '#334155'; btn.style.color = '#fff'; }
+    }
+  }
+
+  /* ============ BINDINGS ============ */
+  // FIX: swapped axisX (was 0→sway) and axisYaw (was 5→yaw) defaults to match physical controller layout
+  const DEFAULT_BINDINGS = {
+    axisX: 5, axisY: 1, axisYaw: 0, axisThrottle: 6,
+    btnTrigger: 0, btnCalib: 8,
+    btnGainUp: 4, btnGainDown: 2, btnVGainUp: 5, btnVGainDown: 3,
+    axisHatX: 4, axisHatY: 5,
+    btnModeSurge: -1, btnModeSway: -1, btnModeHeave: -1,
+    btnModeYaw: -1, btnModePitch: -1, btnModeRoll: -1,
+    btnDepthHold: -1, btnRollHold: -1, btnStabilize: -1
+  };
+
+  let bindings = JSON.parse(localStorage.getItem('gpBindings') || 'null') || {...DEFAULT_BINDINGS};
+
+  function saveBindings() { localStorage.setItem('gpBindings', JSON.stringify(bindings)); }
+
+  function saveBindingsToDisk() {
+    return fetch('/api/bindings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(bindings) });
+  }
+
+  function saveInvertToDisk() {
+    return fetch('/api/invert', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(axisInvert) });
+  }
+
+  function saveToDisk() {
+    Promise.all([saveBindingsToDisk(), saveInvertToDisk()])
+      .then(() => {
+        const btn = document.querySelector('.modal-save-btn');
+        const orig = btn.textContent;
+        btn.textContent = 'SAVED ✓';
+        setTimeout(() => btn.textContent = orig, 1500);
+      })
+      .catch(() => alert('Save failed — check server connection'));
+  }
+
+  fetch('/api/bindings').then(r => r.json()).then(data => { bindings = { ...DEFAULT_BINDINGS, ...data }; saveBindings(); }).catch(() => {});
+  fetch('/api/invert').then(r => r.json()).then(data => { axisInvert = { ...DEFAULT_INVERT, ...data }; saveInvert(); renderInvertButtons(); }).catch(() => {});
+
+  const BINDING_META = [
+    { section: 'Axes' },
+    { key: 'axisX',        label: 'Sway (X)',            type: 'axis'   },
+    { key: 'axisY',        label: 'Surge (Y)',           type: 'axis'   },
+    { key: 'axisYaw',      label: 'Yaw',                 type: 'axis'   },
+    { key: 'axisThrottle', label: 'Heave (Throttle)',    type: 'axis'   },
+    { section: 'Buttons' },
+    { key: 'btnTrigger',   label: 'Pitch / Roll Mode',              type: 'button' },
+    { key: 'btnCalib',     label: 'Calibrate Zero',                 type: 'button' },
+    { key: 'btnGainUp',    label: 'Gain A + (Primary / Sway)',      type: 'button' },
+    { key: 'btnGainDown',  label: 'Gain A − (Primary / Sway)',      type: 'button' },
+    { key: 'btnVGainUp',   label: 'Gain B + (Secondary / Yaw)',     type: 'button' },
+    { key: 'btnVGainDown', label: 'Gain B − (Secondary / Yaw)',     type: 'button' },
+    { section: 'Hat Switch (Gain Mode & Roll Gain)' },
+    { key: 'axisHatX', label: 'Hat X (Roll Gain ←/→)',             type: 'axis' },
+    { key: 'axisHatY', label: 'Hat Y (Mode ↑ Primary / ↓ Sway+Yaw)', type: 'axis' },
+    { section: 'DOF Mode Buttons' },
+    { key: 'btnModeSurge', label: 'Mode: Surge', type: 'button' },
+    { key: 'btnModeSway',  label: 'Mode: Sway',  type: 'button' },
+    { key: 'btnModeHeave', label: 'Mode: Heave', type: 'button' },
+    { key: 'btnModeYaw',   label: 'Mode: Yaw',   type: 'button' },
+    { key: 'btnModePitch', label: 'Mode: Pitch', type: 'button' },
+    { key: 'btnModeRoll',  label: 'Mode: Roll',  type: 'button' },
+    { section: 'Hold Modes' },
+    { key: 'btnDepthHold', label: 'Depth Hold', type: 'button' },
+    { key: 'btnRollHold',  label: 'Roll Hold',  type: 'button' },
+    { key: 'btnStabilize', label: 'Stabilize',  type: 'button' },
+  ];
+
+  let remapTarget = null;
+  let activeTab = 'tab-axes';
+
+  function switchTab(tabId) {
+    activeTab = tabId;
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.modal-tab').forEach(t => t.classList.remove('active'));
+    document.getElementById(tabId).classList.add('active');
+    document.querySelectorAll('.modal-tab').forEach(t => {
+      if (t.getAttribute('onclick') === `switchTab('${tabId}')`) t.classList.add('active');
+    });
+    if (tabId === 'tab-bindings') renderBindings();
+    if (tabId === 'tab-axes') renderInvertButtons();
+  }
+
+  function renderBindings() {
+    const list = document.getElementById('bindingsList');
+    list.innerHTML = '';
+    for (const item of BINDING_META) {
+      if (item.section) {
+        list.innerHTML += `<div class="binding-section">${item.section}</div>`;
+        continue;
+      }
+      const { key, label, type } = item;
+      const listening = remapTarget === key;
+      const valueText = listening
+        ? `Move ${type}...`
+        : `${type === 'axis' ? 'Axis' : 'Button'} ${bindings[key]}`;
+      list.innerHTML += `
+        <div class="binding-row">
+          <div class="binding-label">${label}</div>
+          <div class="binding-value${listening ? ' listening' : ''}">${valueText}</div>
+          <button class="remap-btn${listening ? ' active' : ''}" onclick="startRemap('${key}')">${listening ? 'Cancel' : 'Remap'}</button>
+        </div>`;
+    }
+  }
+
+  function openSettings() {
+    renderInvertButtons();
+    renderBindings();
+    document.getElementById('settingsModal').classList.add('open');
+  }
+
+  function closeSettings() {
+    remapTarget = null;
+    document.getElementById('settingsModal').classList.remove('open');
+  }
+
+  function resetCurrentTab() {
+    if (activeTab === 'tab-axes') {
+      axisInvert = { ...DEFAULT_INVERT };
+      saveInvert();
+      renderInvertButtons();
+    } else if (activeTab === 'tab-bindings') {
+      bindings = {...DEFAULT_BINDINGS};
+      saveBindings();
+      renderBindings();
+    }
+  }
+
+  function startRemap(key) { remapTarget = remapTarget === key ? null : key; renderBindings(); }
+
+  /* ============ CONTROL MATH ============ */
+  function styleThrusterNode(element, pwm) {
+    if (pwm > 1530) {
+      const intensity = (pwm - 1500) / 300;
+      element.style.backgroundColor = `rgba(34, 197, 94, ${0.4 + (intensity * 0.6)})`;
+      element.style.boxShadow = `0 0 15px rgba(34, 197, 94, ${intensity})`;
+    } else if (pwm < 1470) {
+      const intensity = (1500 - pwm) / 300;
+      element.style.backgroundColor = `rgba(239, 68, 68, ${0.4 + (intensity * 0.6)})`;
+      element.style.boxShadow = `0 0 15px rgba(239, 68, 68, ${intensity})`;
+    } else {
+      element.style.backgroundColor = '#334155';
+      element.style.boxShadow = 'none';
+    }
+    const label = document.getElementById(element.id.replace('vis', 'pwm'));
+    if (label) label.textContent = pwm;
+  }
+
+  function updateUIElements() {
+    const any = activeModes.size > 0;
+    const dispX     = (stabilizeActive || (any && !activeModes.has('sway')))  ? 0 : nx;
+    const dispY     = (stabilizeActive || (any && !activeModes.has('surge'))) ? 0 : ny;
+    const dispYaw   = (stabilizeActive || (any && !activeModes.has('yaw')))   ? 0 : yawNorm;
+    const dispPitch = (stabilizeActive || (any && !activeModes.has('pitch'))) ? 0 : currentPitch;
+    const dispHeave = depthHoldActive ? depthCorrection
+                    : (any && !activeModes.has('heave') ? 0 : verticalNorm);
+    const dispRoll  = rollHoldActive  ? rollCorrection
+                    : (any && !activeModes.has('roll')  ? 0 : currentRoll);
+
+    leftStick.style.transform = `translate(calc(-50% + ${dispX * 40}px), calc(-50% + ${dispY * 40}px))`;
+
+    if (rightStickRov) {
+      rightStickRov.style.transform = `translateY(${-dispHeave * 40}px) rotateZ(${dispYaw * 45}deg) rotateX(${dispPitch * 60}deg)`;
+    }
+
+    // Always update all 5 independent gain values
+    document.getElementById('valGain').textContent     = Math.round(primaryGain   * 100) + '%';
+    document.getElementById('valVGain').textContent    = Math.round(secondaryGain * 100) + '%';
+    document.getElementById('valSwayGain').textContent = Math.round(swayGain      * 100) + '%';
+    document.getElementById('valYawGain').textContent  = Math.round(yawGain       * 100) + '%';
+    document.getElementById('valRollGain').textContent = Math.round(rollGain      * 100) + '%';
+
+    // Mode badge and highlight show which pair Gain A/B buttons currently edit
+    const modeTag = document.getElementById('gainModeTag');
+    const boxPri  = document.getElementById('gainBoxPrimary');
+    const boxSec  = document.getElementById('gainBoxSecondary');
+    const boxSway = document.getElementById('gainBoxSway');
+    const boxYaw  = document.getElementById('gainBoxYaw');
+    const valSway = document.getElementById('valSwayGain');
+    const valYaw  = document.getElementById('valYawGain');
+    const valPri  = document.getElementById('valGain');
+    const valSec  = document.getElementById('valVGain');
+    if (gainMode === 'sway-yaw') {
+      if (modeTag) { modeTag.textContent = 'EDITING: SWAY + YAW'; modeTag.style.borderColor = '#f59e0b'; modeTag.style.color = '#f59e0b'; modeTag.style.background = 'rgba(245,158,11,0.1)'; }
+      if (boxPri)  boxPri.style.borderColor  = '#334155';
+      if (boxSec)  boxSec.style.borderColor  = '#334155';
+      if (boxSway) boxSway.style.borderColor = '#f59e0b';
+      if (boxYaw)  boxYaw.style.borderColor  = '#f59e0b';
+      if (valPri)  valPri.style.color  = '#475569';
+      if (valSec)  valSec.style.color  = '#475569';
+      if (valSway) valSway.style.color = '#f59e0b';
+      if (valYaw)  valYaw.style.color  = '#f59e0b';
+    } else {
+      if (modeTag) { modeTag.textContent = 'EDITING: PRIMARY + SECONDARY'; modeTag.style.borderColor = '#38bdf8'; modeTag.style.color = '#38bdf8'; modeTag.style.background = 'rgba(56,189,248,0.1)'; }
+      if (boxPri)  boxPri.style.borderColor  = '#38bdf8';
+      if (boxSec)  boxSec.style.borderColor  = '#a78bfa';
+      if (boxSway) boxSway.style.borderColor = '#334155';
+      if (boxYaw)  boxYaw.style.borderColor  = '#334155';
+      if (valPri)  valPri.style.color  = '#38bdf8';
+      if (valSec)  valSec.style.color  = '#a78bfa';
+      if (valSway) valSway.style.color = '#475569';
+      if (valYaw)  valYaw.style.color  = '#475569';
+    }
+
+    document.getElementById('valSurge').textContent = Math.round(-dispY * 100) + '%';
+    document.getElementById('valSway').textContent  = Math.round(dispX * 100) + '%';
+    document.getElementById('valHeave').textContent = Math.round(dispHeave * 100) + '%';
+    document.getElementById('valYaw').textContent   = Math.round(dispYaw * 100) + '%';
+    document.getElementById('valPitch').textContent = Math.round(dispPitch * 100) + '%';
+    document.getElementById('valRoll').textContent  = Math.round(dispRoll * 100) + '%';
+  }
+
+  function updateThrusters() {
+    const any = activeModes.size > 0;
+    const forward  = (stabilizeActive || (any && !activeModes.has('surge'))) ? 0 : -ny;
+    const strafe   = (stabilizeActive || (any && !activeModes.has('sway')))  ? 0 : nx;
+    const yaw      = (stabilizeActive || (any && !activeModes.has('yaw')))   ? 0 : yawNorm;
+    const vertical = depthHoldActive ? depthCorrection
+                   : (any && !activeModes.has('heave') ? 0 : verticalNorm);
+    const roll     = rollHoldActive  ? rollCorrection
+                   : (any && !activeModes.has('roll')  ? 0 : currentRoll);
+
+    let fl = forward + strafe + yaw;
+    let fr = forward - strafe - yaw;
+    let rl = forward + strafe - yaw;
+    let rr = forward - strafe + yaw;
+
+    const max_h = Math.max(1.0, Math.abs(fl), Math.abs(fr), Math.abs(rl), Math.abs(rr));
+    fl /= max_h; fr /= max_h; rl /= max_h; rr /= max_h;
+
+    let vl = vertical + roll;
+    let vr = vertical - roll;
+    const max_v = Math.max(1.0, Math.abs(vl), Math.abs(vr));
+    vl /= max_v; vr /= max_v;
+
+    const values = {
+      FL: mixToPwm(fl), FR: mixToPwm(fr), RL: mixToPwm(rl), RR: mixToPwm(rr),
+      VL: mixToPwm(vl), VR: mixToPwm(vr)
+    };
+
+    for (const k of Object.keys(values)) styleThrusterNode(visNodes[k], values[k]);
+
+    updateUIElements();
+  }
+
+  function emitJoystick() {
+    const any = activeModes.size > 0;
+    const effX      = (stabilizeActive || (any && !activeModes.has('sway')))  ? 0 : nx;
+    const effY      = (stabilizeActive || (any && !activeModes.has('surge'))) ? 0 : ny;
+    const effYaw    = (stabilizeActive || (any && !activeModes.has('yaw')))   ? 0 : yawNorm;
+    const effPitch  = (stabilizeActive || (any && !activeModes.has('pitch'))) ? 0 : currentPitch;
+    const effHeave  = depthHoldActive ? depthCorrection
+                    : (any && !activeModes.has('heave') ? 0 : verticalNorm);
+    const effRoll   = rollHoldActive  ? rollCorrection
+                    : (any && !activeModes.has('roll')  ? 0 : currentRoll);
+    socket.emit('joystick-input', {
+      x: effX, y: effY, yaw: effYaw, vertical: effHeave,
+      pitch: effPitch, roll: effRoll,
+      gain: 1.0, verticalGain: 1.0
+    });
+  }
+
+  function setFromPointer(clientX, clientY) {
+    const trackpad = document.getElementById('trackpad');
+    const rect = trackpad.getBoundingClientRect();
+    const cx = rect.left + rect.width / 2;
+    const cy = rect.top + rect.height / 2;
+    const dx = clientX - cx;
+    const dy = clientY - cy;
+    const maxDist = Math.min(rect.width, rect.height) / 2 - 16;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    const scale = dist > maxDist ? maxDist / dist : 1;
+
+    nx = clamp((dx * scale) / maxDist, -1, 1);
+    ny = clamp((dy * scale) / maxDist, -1, 1);
+
+    updateThrusters();
+    emitJoystick();
+  }
+
+  let dragging = false;
+  document.getElementById('trackpad').addEventListener('pointerdown', (e) => {
+    dragging = true;
+    e.target.setPointerCapture(e.pointerId);
+    setFromPointer(e.clientX, e.clientY);
+  });
+  document.getElementById('trackpad').addEventListener('pointermove', (e) => {
+    if (!dragging) return;
+    setFromPointer(e.clientX, e.clientY);
+  });
+
+  function resetPad() {
+    dragging = false; nx = 0; ny = 0;
+    updateThrusters(); emitJoystick();
+  }
+  document.getElementById('trackpad').addEventListener('pointerup', resetPad);
+  document.getElementById('trackpad').addEventListener('pointercancel', resetPad);
+  window.addEventListener('resize', updateThrusters);
+
+  /* ============ GAMEPAD ============ */
+  function scaleAxis(raw, offset) {
+    if (raw === offset) return 0;
+    const shortestDist = Math.min(1.0 - offset, offset + 1.0);
+    if (shortestDist === 0) return 0;
+    return Math.max(-1.0, Math.min(1.0, (raw - offset) / shortestDist));
+  }
+
+  function pollGamepad() {
+    const pads = navigator.getGamepads ? navigator.getGamepads() : [];
+    const gp = gpIndex !== null ? pads[gpIndex] : pads[0];
+
+    if (gp) {
+      if (remapTarget !== null) {
+        const meta = BINDING_META.find(m => m.key === remapTarget);
+        if (meta?.type === 'axis') {
+          for (let i = 0; i < gp.axes.length; i++) {
+            if (Math.abs(gp.axes[i]) > 0.7) {
+              bindings[remapTarget] = i; saveBindings(); remapTarget = null; renderBindings(); break;
+            }
+          }
+        } else if (meta?.type === 'button') {
+          for (let i = 0; i < gp.buttons.length; i++) {
+            if (gp.buttons[i]?.pressed) {
+              bindings[remapTarget] = i; saveBindings(); remapTarget = null; renderBindings(); break;
+            }
+          }
+        }
+      } else {
+        const deadzone = (v) => Math.abs(v) < 0.2 ? 0 : v;
+
+        const calibBtn = gp.buttons[bindings.btnCalib]?.pressed;
+        if (calibBtn && !btn8WasPressed) {
+          offsetX        = gp.axes[bindings.axisX]        || 0;
+          offsetY        = gp.axes[bindings.axisY]        || 0;
+          offsetYaw      = gp.axes[bindings.axisYaw]      || 0;
+          offsetThrottle = gp.axes[bindings.axisThrottle] || 0;
+          const connEl = document.getElementById('conn');
+          if (connEl) {
+            connEl.innerText = 'CALIBRATED ZERO'; connEl.style.color = '#facc15';
+          }
+        }
+        btn8WasPressed = calibBtn;
+
+        // FIX: axisX now correctly reads sway axis, axisYaw reads yaw axis
+        const raw_x        = deadzone(scaleAxis(gp.axes[bindings.axisX]        || 0, offsetX));
+        const raw_y        = deadzone(scaleAxis(gp.axes[bindings.axisY]        || 0, offsetY));
+        const raw_yaw      = deadzone(scaleAxis(gp.axes[bindings.axisYaw]      || 0, offsetYaw));
+        const raw_throttle = deadzone(scaleAxis(gp.axes[bindings.axisThrottle] || 0, offsetThrottle));
+
+        const trigger  = gp.buttons[bindings.btnTrigger]?.pressed;
+        // Hat switch reads as POV axes (-1, 0, 1) — rising-edge detection per direction
+        const hatX = Math.round(gp.axes[bindings.axisHatX] || 0);
+        const hatY = Math.round(gp.axes[bindings.axisHatY] || 0);
+
+        // Hat Y-axis: switch gain mode (up=1 → primary+secondary, down=-1 → sway+yaw)
+        if (hatY === 1  && prevHatY !== 1)  gainMode = 'primary-secondary';
+        if (hatY === -1 && prevHatY !== -1) gainMode = 'sway-yaw';
+        // Hat X-axis: roll gain (right=1 → +, left=-1 → −)
+        if (hatX === 1  && prevHatX !== 1)  rollGain = Math.min(1.0, Math.round((rollGain + 0.1) * 10) / 10);
+        if (hatX === -1 && prevHatX !== -1) rollGain = Math.max(0.1, Math.round((rollGain - 0.1) * 10) / 10);
+        prevHatX = hatX; prevHatY = hatY;
+
+        const gainUp   = bindings.btnGainUp   >= 0 && !!gp.buttons[bindings.btnGainUp]?.pressed;
+        const gainDown = bindings.btnGainDown >= 0 && !!gp.buttons[bindings.btnGainDown]?.pressed;
+        const vgUp     = bindings.btnVGainUp  >= 0 && !!gp.buttons[bindings.btnVGainUp]?.pressed;
+        const vgDown   = bindings.btnVGainDown >= 0 && !!gp.buttons[bindings.btnVGainDown]?.pressed;
+
+        // Gain A/B buttons are context-sensitive based on current gain mode
+        if (gainMode === 'primary-secondary') {
+          if (gainUp   && !gainUpWas)   primaryGain   = Math.min(1.0, Math.round((primaryGain   + 0.1) * 10) / 10);
+          if (gainDown && !gainDownWas) primaryGain   = Math.max(0.1, Math.round((primaryGain   - 0.1) * 10) / 10);
+          if (vgUp     && !vgUpWas)     secondaryGain = Math.min(1.0, Math.round((secondaryGain + 0.1) * 10) / 10);
+          if (vgDown   && !vgDownWas)   secondaryGain = Math.max(0.1, Math.round((secondaryGain - 0.1) * 10) / 10);
+        } else {
+          if (gainUp   && !gainUpWas)   swayGain = Math.min(1.0, Math.round((swayGain + 0.1) * 10) / 10);
+          if (gainDown && !gainDownWas) swayGain = Math.max(0.1, Math.round((swayGain - 0.1) * 10) / 10);
+          if (vgUp     && !vgUpWas)     yawGain  = Math.min(1.0, Math.round((yawGain  + 0.1) * 10) / 10);
+          if (vgDown   && !vgDownWas)   yawGain  = Math.max(0.1, Math.round((yawGain  - 0.1) * 10) / 10);
+        }
+        gainUpWas = gainUp; gainDownWas = gainDown; vgUpWas = vgUp; vgDownWas = vgDown;
+
+        const bp = key => bindings[key] >= 0 && !!gp.buttons[bindings[key]]?.pressed;
+        const bSurge=bp('btnModeSurge'), bSway=bp('btnModeSway'), bHeave=bp('btnModeHeave');
+        const bYaw=bp('btnModeYaw'), bPitch=bp('btnModePitch'), bRoll=bp('btnModeRoll');
+
+        if (bSurge && !modeSurgeWas) setMode('surge');
+        if (bSway  && !modeSwayWas)  setMode('sway');
+        if (bHeave && !modeHeaveWas) setMode('heave');
+        if (bYaw   && !modeYawWas)   setMode('yaw');
+        if (bPitch && !modePitchWas) setMode('pitch');
+        if (bRoll  && !modeRollWas)  setMode('roll');
+        modeSurgeWas=bSurge; modeSwayWas=bSway; modeHeaveWas=bHeave;
+        modeYawWas=bYaw; modePitchWas=bPitch; modeRollWas=bRoll;
+
+        const bDepth=bp('btnDepthHold'), bRollH=bp('btnRollHold'), bStab=bp('btnStabilize');
+        if (bDepth && !depthHoldWas) setHoldMode('depth');
+        if (bRollH && !rollHoldWas)  setHoldMode('roll');
+        if (bStab  && !stabilizeWas) setHoldMode('stabilize');
+        depthHoldWas=bDepth; rollHoldWas=bRollH; stabilizeWas=bStab;
+
+        let surge = 0, sway = 0, pitch = 0, roll = 0, yaw = 0;
+        if (trigger) {
+          pitch = applyInvert(raw_y * primaryGain, 'pitch');
+          roll  = applyInvert(raw_x * rollGain, 'roll');
+          yaw   = applyInvert(raw_yaw * yawGain, 'yaw');
+        } else {
+          surge = applyInvert(raw_y * primaryGain, 'surge');
+          sway  = applyInvert(raw_x * swayGain, 'sway');
+          yaw   = applyInvert(raw_yaw * yawGain, 'yaw');
+        }
+
+        nx = clamp(sway, -1, 1);
+        ny = clamp(surge, -1, 1);
+        yawNorm = clamp(yaw, -1, 1);
+        verticalNorm = clamp(applyInvert(-raw_throttle * secondaryGain, 'heave'), -1, 1);
+        currentPitch = clamp(pitch, -1, 1);
+        currentRoll  = clamp(roll, -1, 1);
+
+        if (depthHoldActive) {
+          if (Math.abs(verticalNorm) > 0.05) {
+            depthHoldTarget = latestDepth;
+            depthCorrection = verticalNorm;
+          } else {
+            const dDir = axisInvert.depthHoldDir ? -1 : 1;
+            depthCorrection = clamp((depthHoldTarget - latestDepth) * DEPTH_HOLD_KP, -1, 1) * dDir;
+          }
+        }
+        if (rollHoldActive) {
+          const rDir = axisInvert.rollHoldDir ? -1 : 1;
+          rollCorrection = clamp((0 - latestRollDeg) * ROLL_HOLD_KP, -1, 1) * rDir;
+        }
+
+        updateThrusters();
+        emitJoystick();
+      }
+    }
+    requestAnimationFrame(pollGamepad);
+  }
+
+  window.addEventListener('gamepadconnected', (e) => {
+    gpIndex = e.gamepad.index;
+    requestAnimationFrame(pollGamepad);
+  });
+
+  /* ============ ARM ============ */
+  let arm1_gripper_state = 0;
+  let arm2_gripper_state = 0;
+
+  function armPayload() {
+    return {
+      arm1_slew:     applyInvertPwm(Number(document.getElementById('arm1_slew').value),     'arm1Slew'),
+      arm1_shoulder: applyInvertPwm(Number(document.getElementById('arm1_shoulder').value), 'arm1Shoulder'),
+      arm1_rotate:   applyInvertPwm(Number(document.getElementById('arm1_rotate').value),   'arm1Rotate'),
+      arm1_gripper:  applyInvertGripper(arm1_gripper_state, 'arm1Gripper'),
+      arm2_slew:     applyInvertPwm(Number(document.getElementById('arm2_slew').value),     'arm2Slew'),
+      arm2_shoulder: applyInvertPwm(Number(document.getElementById('arm2_shoulder').value), 'arm2Shoulder'),
+      arm2_rotate:   applyInvertPwm(Number(document.getElementById('arm2_rotate').value),   'arm2Rotate'),
+      arm2_gripper:  applyInvertGripper(arm2_gripper_state, 'arm2Gripper'),
+    };
+  }
+
+  function updateArmValue(id) {
+    document.getElementById(id + '_val').textContent = document.getElementById(id).value;
+  }
+
+  function emitArmControls() { socket.emit('arm-control', armPayload()); }
+
+  ['arm1_slew','arm1_shoulder','arm1_rotate','arm2_slew','arm2_shoulder','arm2_rotate'].forEach(id => {
+    const el = document.getElementById(id);
+    el.addEventListener('input', () => { updateArmValue(id); emitArmControls(); });
+    el.addEventListener('change', () => { el.value = 1500; updateArmValue(id); emitArmControls(); });
+  });
+
+  const gripperButtons = {
+    arm1_gripper_close: { state: 1, arm: 'arm1' },
+    arm1_gripper_open:  { state: 2, arm: 'arm1' },
+    arm2_gripper_close: { state: 1, arm: 'arm2' },
+    arm2_gripper_open:  { state: 2, arm: 'arm2' },
+  };
+
+  for (const [id, { state, arm }] of Object.entries(gripperButtons)) {
+    const button = document.getElementById(id);
+    button.addEventListener('mousedown', () => {
+      if (arm === 'arm1') arm1_gripper_state = state;
+      else arm2_gripper_state = state;
+      emitArmControls();
+    });
+    button.addEventListener('mouseup', () => {
+      if (arm === 'arm1' && arm1_gripper_state === state) arm1_gripper_state = 0;
+      if (arm === 'arm2' && arm2_gripper_state === state) arm2_gripper_state = 0;
+      emitArmControls();
+    });
+    button.addEventListener('mouseleave', () => {
+      if (arm === 'arm1' && arm1_gripper_state === state) { arm1_gripper_state = 0; emitArmControls(); }
+      if (arm === 'arm2' && arm2_gripper_state === state) { arm2_gripper_state = 0; emitArmControls(); }
+    });
+  }
+
+  const gripperKeys = {
+    'h': { state: 1, arm: 'arm1' },
+    'j': { state: 2, arm: 'arm1' },
+    'k': { state: 1, arm: 'arm2' },
+    'l': { state: 2, arm: 'arm2' },
+  };
+
+  window.addEventListener('keydown', (e) => {
+    if (gripperKeys[e.key]) {
+      const { state, arm } = gripperKeys[e.key];
+      if (arm === 'arm1') arm1_gripper_state = state;
+      else arm2_gripper_state = state;
+      emitArmControls();
+    }
+  });
+
+  window.addEventListener('keyup', (e) => {
+    if (gripperKeys[e.key]) {
+      const { state, arm } = gripperKeys[e.key];
+      if (arm === 'arm1' && arm1_gripper_state === state) arm1_gripper_state = 0;
+      if (arm === 'arm2' && arm2_gripper_state === state) arm2_gripper_state = 0;
+      emitArmControls();
+    }
+  });
+
+  updateThrusters();
+  emitArmControls();
+</script>
+</body>
+</html>

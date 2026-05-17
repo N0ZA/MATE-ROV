@@ -30,6 +30,7 @@ let latestRobotData = {
   roll: 0,
   pitch: 0,
   yaw: 0,
+  depth: 0,
   thrusters: [1500,1500,1500,1500,1500,1500]
 };
 
@@ -48,7 +49,30 @@ let armData = {
   arm2_gripper: 0 // 0 for stop, 1 for close, 2 for open
 };
 
-let thrusterDirs = {1:1,2:1,3:1,4:1,5:1,6:1};
+const CALIBRATION_FILE = join(__dirname, 'calibration.json');
+function loadCalibration() {
+  try {
+    const d = JSON.parse(fs.readFileSync(CALIBRATION_FILE, 'utf8'));
+    return {
+      thrusterDirs:     d.thrusterDirs     || {1:1,2:1,3:1,4:1,5:1,6:1},
+      thrusterSelected: d.thrusterSelected || {1:false,2:false,3:false,4:false,5:false,6:false}
+    };
+  } catch {
+    return {
+      thrusterDirs:     {1:1,2:1,3:1,4:1,5:1,6:1},
+      thrusterSelected: {1:false,2:false,3:false,4:false,5:false,6:false}
+    };
+  }
+}
+function saveCalibrationToFile() {
+  fs.writeFileSync(CALIBRATION_FILE, JSON.stringify({ thrusterDirs, thrusterSelected }, null, 2));
+}
+
+const _cal = loadCalibration();
+let thrusterDirs     = _cal.thrusterDirs;
+let thrusterSelected = _cal.thrusterSelected;
+let pixhawkOffset    = null;
+let surfacePressure  = null; // hPa — captured on first Bar30 packet
 
 /* ================= SAFE ARDUINO SERIAL ================= */
 const ARDUINO_PORT = process.env.ARDUINO_PORT || '/dev/ttyACM1';
@@ -94,10 +118,8 @@ function startArduino() {
 
       armData.arm1_shoulder = toPwm(angles[0]);
       armData.arm1_rotate   = toPwm(angles[1]);
-      // armData.arm1_gripper  = toPwm(angles[2]); // Gripper is now digital
       armData.arm2_shoulder = toPwm(angles[3]);
       armData.arm2_rotate   = toPwm(angles[4]);
-      // armData.arm2_gripper  = toPwm(angles[5]); // Gripper is now digital
 
       io.emit('arm-update', armData);
     });
@@ -115,10 +137,13 @@ startArduino();
 
 /* ================= BINDINGS PERSISTENCE ================= */
 const BINDINGS_FILE = join(__dirname, 'bindings.json');
+// FIX: swapped axisX and axisYaw defaults to match physical controller layout
+// axisX (sway) = axis 5 (was 0), axisYaw = axis 0 (was 5)
 const DEFAULT_BINDINGS = {
-  axisX: 0, axisY: 1, axisYaw: 5, axisThrottle: 6,
-  btnTrigger: 0, btnCalib: 8, btnGainUp: 12, btnGainDown: 13,
-  btnVGainUp: 4, btnVGainDown: 5
+  axisX: 5, axisY: 1, axisYaw: 0, axisThrottle: 6,
+  btnTrigger: 0, btnCalib: 8,
+  btnGainUp: 4, btnGainDown: 2, btnVGainUp: 5, btnVGainDown: 3,
+  axisHatX: 4, axisHatY: 5
 };
 
 function loadBindings() {
@@ -135,11 +160,33 @@ function saveBindingsToFile(data) {
 
 let savedBindings = loadBindings();
 
+/* ================= AXIS INVERT PERSISTENCE ================= */
+const INVERT_FILE = join(__dirname, 'invert.json');
+const DEFAULT_INVERT = {
+  surge: false, sway: false, heave: false, yaw: false, pitch: false, roll: false,
+  depthHoldDir: false, rollHoldDir: false,
+  arm1Slew: false, arm1Shoulder: false, arm1Rotate: false, arm1Gripper: false,
+  arm2Slew: false, arm2Shoulder: false, arm2Rotate: false, arm2Gripper: false
+};
+
+function loadInvert() {
+  try {
+    return { ...DEFAULT_INVERT, ...JSON.parse(fs.readFileSync(INVERT_FILE, 'utf8')) };
+  } catch {
+    return { ...DEFAULT_INVERT };
+  }
+}
+
+function saveInvertToFile(data) {
+  fs.writeFileSync(INVERT_FILE, JSON.stringify(data, null, 2));
+}
+
+let savedInvert = loadInvert();
+
 /* ================= EXPRESS ================= */
 app.use(express.json());
-app.get('/', (req, res) => res.sendFile(join(__dirname, '../Frontend', 'index.html')));
-app.use(express.static(join(__dirname, '../Frontend')));
-
+app.get('/', (req, res) => res.sendFile(join(__dirname, '../frontend', 'index.html')));
+app.use(express.static(join(__dirname, '../frontend')));
 app.get('/api/bindings', (req, res) => {
   res.json(savedBindings);
 });
@@ -148,6 +195,17 @@ app.post('/api/bindings', (req, res) => {
   savedBindings = { ...DEFAULT_BINDINGS, ...req.body };
   saveBindingsToFile(savedBindings);
   console.log('💾 Bindings saved:', JSON.stringify(savedBindings));
+  res.json({ ok: true });
+});
+
+app.get('/api/invert', (req, res) => {
+  res.json(savedInvert);
+});
+
+app.post('/api/invert', (req, res) => {
+  savedInvert = { ...DEFAULT_INVERT, ...req.body };
+  saveInvertToFile(savedInvert);
+  console.log('💾 Axis invert saved:', JSON.stringify(savedInvert));
   res.json({ ok: true });
 });
 
@@ -161,7 +219,7 @@ app.get('/cam1', (req, res) => {
   req.on('close', () => camClients.delete(res));
 });
 
-const gst = spawn('gst-launch-1.0', [
+const GST_ARGS = [
   'udpsrc', 'port=5600',
   '!', 'application/x-rtp,media=video,clock-rate=90000,encoding-name=H264',
   '!', 'rtph264depay', '!', 'h264parse',
@@ -172,16 +230,35 @@ const gst = spawn('gst-launch-1.0', [
   '!', 'jpegenc', 'quality=80',
   '!', 'multipartmux', 'boundary=frame',
   '!', 'fdsink', 'fd=1'
-]);
+];
 
-gst.stdout.on('data', chunk => {
-  for (const res of camClients) res.write(chunk);
-});
-gst.stderr.on('data', d => console.log('🎥 GStreamer:', d.toString().trim()));
-gst.on('exit', code => console.log('🎥 GStreamer exited:', code));
+let gstProc = null;
+
+function startGStreamer() {
+  gstProc = spawn('gst-launch-1.0', GST_ARGS);
+  gstProc.stdout.on('data', chunk => {
+    for (const res of camClients) res.write(chunk);
+  });
+  gstProc.stderr.on('data', d => console.log('🎥 GStreamer:', d.toString().trim()));
+  gstProc.on('exit', code => {
+    console.log('🎥 GStreamer exited:', code, '— restarting in 3s');
+    gstProc = null;
+    setTimeout(startGStreamer, 3000);
+  });
+}
+
+startGStreamer();
+
+function shutdown() {
+  if (gstProc) { gstProc.kill(); gstProc = null; }
+  process.exit(0);
+}
+process.on('SIGTERM', shutdown);
+process.on('SIGINT', shutdown);
 
 /* ================= MIXING ================= */
 function clamp(v,min,max){return Math.max(min,Math.min(max,v));}
+function wrapAngle(deg){return ((deg%360)+540)%360-180;}
 
 function mixThrusters(j){
   const g = clamp(j.gain||0.5,0,1);
@@ -190,7 +267,7 @@ function mixThrusters(j){
   const x = clamp(j.x||0,-1,1);
   const y = clamp(j.y||0,-1,1);
   const yaw = clamp(j.yaw||0,-1,1);
-  const vertical = clamp(j.vertical||0,-1,1) * vg;
+  const vertical = clamp(j.vertical||0,-1,1);
   const roll = clamp(j.roll||0,-1,1);
 
   let fl = -y + x + yaw;
@@ -207,18 +284,21 @@ function mixThrusters(j){
   const maxV = Math.max(1,Math.abs(vl),Math.abs(vr));
   vl/=maxV; vr/=maxV;
 
-  const pwmMin = 1500 - g * 400;
-  const pwmMax = 1500 + g * 400;
-  const toPwm = (v,id)=>
-    Math.round(clamp(1500+v*thrusterDirs[id]*400, pwmMin, pwmMax));
+  const pwmMinH = 1500 - g  * 300,  pwmMaxH = 1500 + g  * 300;
+  const pwmMinV = 1500 - vg * 300,  pwmMaxV = 1500 + vg * 300;
+  const toPwmH = (v,id) => Math.round(clamp(1500+v*thrusterDirs[id]*300, pwmMinH, pwmMaxH));
+  const toPwmV = (v,id) => Math.round(clamp(1500+v*thrusterDirs[id]*300, pwmMinV, pwmMaxV));
+
+  const anySelected = Object.values(thrusterSelected).some(v => v);
+  const mask = id => (anySelected && !thrusterSelected[id]) ? 0 : 1;
 
   return [
-    toPwm(fl,1),
-    toPwm(fr,2),
-    toPwm(rl,3),
-    toPwm(rr,4),
-    toPwm(vl,5),
-    toPwm(vr,6)
+    toPwmH(fl * mask(1), 1),
+    toPwmH(fr * mask(2), 2),
+    toPwmH(rl * mask(3), 3),
+    toPwmH(rr * mask(4), 4),
+    toPwmV(vl * mask(5), 5),
+    toPwmV(vr * mask(6), 6)
   ];
 }
 
@@ -267,10 +347,38 @@ parser.on('data', (packet) => {
   try {
     const data = packet.protocol.data(packet.payload, clazz);
     if (data.roll !== undefined) {
-      latestRobotData.roll  = Number((data.roll  * 180 / Math.PI).toFixed(1));
-      latestRobotData.pitch = Number((data.pitch * 180 / Math.PI).toFixed(1));
-      latestRobotData.yaw   = Number((data.yaw   * 180 / Math.PI).toFixed(1));
-      io.emit('robot-data', latestRobotData);
+      const rawRoll  = Number((data.roll  * 180 / Math.PI).toFixed(1));
+      const rawPitch = Number((data.pitch * 180 / Math.PI).toFixed(1));
+      const rawYaw   = Number((data.yaw   * 180 / Math.PI).toFixed(1));
+
+      if (!pixhawkOffset) {
+        pixhawkOffset = { roll: rawRoll, pitch: rawPitch, yaw: rawYaw };
+        console.log('🧭 Pixhawk offset set:', pixhawkOffset);
+      }
+
+      latestRobotData.roll  = Number((rawRoll  - pixhawkOffset.roll).toFixed(1));
+      latestRobotData.pitch = Number((rawPitch - pixhawkOffset.pitch).toFixed(1));
+      latestRobotData.yaw   = Number(wrapAngle(rawYaw - pixhawkOffset.yaw).toFixed(1));
+      io.emit('robot-data', { ...latestRobotData, pixhawkLive: true });
+    }
+
+    // SCALED_PRESSURE (msg 29) — Bar30 direct depth (primary source)
+    // pressAbs in hPa; depth = (pressAbs - surface) * 100 / (rho * g)
+    // Using freshwater density 997 kg/m³: factor ≈ 0.010227 m/hPa
+    if (data.pressAbs !== undefined && data.pressDiff !== undefined) {
+      if (!surfacePressure) {
+        surfacePressure = data.pressAbs;
+        console.log('🌊 Surface pressure set:', surfacePressure.toFixed(2), 'hPa');
+      }
+      const depth = Math.max(0, (data.pressAbs - surfacePressure) * 0.010227);
+      latestRobotData.depth = Number(depth.toFixed(2));
+      io.emit('robot-data', { ...latestRobotData });
+    }
+
+    // VFRHUD — fallback depth if SCALED_PRESSURE not available
+    if (data.alt !== undefined && data.groundspeed !== undefined && !surfacePressure) {
+      latestRobotData.depth = Number((-data.alt).toFixed(2));
+      io.emit('robot-data', { ...latestRobotData });
     }
   } catch (e) {}
 });
@@ -280,10 +388,22 @@ io.on('connection', socket=>{
   console.log('🎮 Client connected');
 
   socket.emit('robot-data', latestRobotData);
+  socket.emit('calibration-state', { dirs: thrusterDirs, selected: thrusterSelected });
 
   socket.on('toggle-direction', (id) => {
     thrusterDirs[id] *= -1;
     io.emit('direction-update', { id, dir: thrusterDirs[id] });
+  });
+
+  socket.on('toggle-selection', (id) => {
+    thrusterSelected[id] = !thrusterSelected[id];
+    io.emit('selection-update', { id, selected: thrusterSelected[id] });
+  });
+
+  socket.on('save-calibration', () => {
+    saveCalibrationToFile();
+    console.log('💾 Calibration saved:', JSON.stringify({ thrusterDirs, thrusterSelected }));
+    socket.emit('calibration-saved');
   });
 
   socket.on('joystick-input', data=>{
@@ -313,5 +433,3 @@ server.listen(3000, ()=>{
   console.log('🌐 http://localhost:3000');
   console.log('🤖 Teensy:', TEENSY_IP+':'+TEENSY_PORT);
 });
-
-

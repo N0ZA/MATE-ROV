@@ -1,0 +1,23 @@
+{
+  "axisX": 2,
+  "axisY": 1,
+  "axisYaw": 0,
+  "axisThrottle": 3,
+  "btnTrigger": 0,
+  "btnCalib": 8,
+  "btnGainUp": 4,
+  "btnGainDown": 2,
+  "btnVGainUp": 5,
+  "btnVGainDown": 3,
+  "axisHatX": 4,
+  "axisHatY": 5,
+  "btnModeSurge": -1,
+  "btnModeSway": -1,
+  "btnModeHeave": -1,
+  "btnModeYaw": 9,
+  "btnModePitch": 10,
+  "btnModeRoll": 11,
+  "btnDepthHold": 6,
+  "btnRollHold": 7,
+  "btnStabilize": 1
+}
