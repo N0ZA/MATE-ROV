@@ -1,7 +1,7 @@
 {
-  "axisX": 2,
+  "axisX": 0,
   "axisY": 1,
-  "axisYaw": 0,
+  "axisYaw": 2,
   "axisThrottle": 3,
   "btnTrigger": 0,
   "btnCalib": 8,
@@ -19,5 +19,11 @@
   "btnModeRoll": 11,
   "btnDepthHold": 6,
   "btnRollHold": 7,
-  "btnStabilize": 1
+  "btnStabilize": 1,
+  "btnArm1Rotate1100": -1,
+  "btnArm1Rotate1900": -1,
+  "btnArm2Rotate1100": -1,
+  "btnArm2Rotate1900": -1,
+  "btnArm": -1,
+  "btnDisarm": -1
 }

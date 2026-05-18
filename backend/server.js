@@ -26,6 +26,8 @@ const parser = new MavLinkPacketParser();
 const REGISTRY = { ...common.REGISTRY };
 
 /* ================= STATE ================= */
+let isArmed = true;
+
 let latestRobotData = {
   roll: 0,
   pitch: 0,
@@ -270,10 +272,10 @@ function mixThrusters(j){
   const vertical = clamp(j.vertical||0,-1,1);
   const roll = clamp(j.roll||0,-1,1);
 
-  let fl = -y + x + yaw;
-  let fr = -y - x - yaw;
-  let rl = -y + x - yaw;
-  let rr = -y - x + yaw;
+  let fl = -y + yaw + x;
+  let fr = -y - yaw - x;
+  let rl = -y + yaw - x;
+  let rr = -y - yaw + x;
 
   const maxH = Math.max(1,Math.abs(fl),Math.abs(fr),Math.abs(rl),Math.abs(rr));
   fl/=maxH; fr/=maxH; rl/=maxH; rr/=maxH;
@@ -347,38 +349,18 @@ parser.on('data', (packet) => {
   try {
     const data = packet.protocol.data(packet.payload, clazz);
     if (data.roll !== undefined) {
-      const rawRoll  = Number((data.roll  * 180 / Math.PI).toFixed(1));
       const rawPitch = Number((data.pitch * 180 / Math.PI).toFixed(1));
       const rawYaw   = Number((data.yaw   * 180 / Math.PI).toFixed(1));
 
       if (!pixhawkOffset) {
+        const rawRoll = Number((data.roll * 180 / Math.PI).toFixed(1));
         pixhawkOffset = { roll: rawRoll, pitch: rawPitch, yaw: rawYaw };
         console.log('🧭 Pixhawk offset set:', pixhawkOffset);
       }
 
-      latestRobotData.roll  = Number((rawRoll  - pixhawkOffset.roll).toFixed(1));
       latestRobotData.pitch = Number((rawPitch - pixhawkOffset.pitch).toFixed(1));
       latestRobotData.yaw   = Number(wrapAngle(rawYaw - pixhawkOffset.yaw).toFixed(1));
       io.emit('robot-data', { ...latestRobotData, pixhawkLive: true });
-    }
-
-    // SCALED_PRESSURE (msg 29) — Bar30 direct depth (primary source)
-    // pressAbs in hPa; depth = (pressAbs - surface) * 100 / (rho * g)
-    // Using freshwater density 997 kg/m³: factor ≈ 0.010227 m/hPa
-    if (data.pressAbs !== undefined && data.pressDiff !== undefined) {
-      if (!surfacePressure) {
-        surfacePressure = data.pressAbs;
-        console.log('🌊 Surface pressure set:', surfacePressure.toFixed(2), 'hPa');
-      }
-      const depth = Math.max(0, (data.pressAbs - surfacePressure) * 0.010227);
-      latestRobotData.depth = Number(depth.toFixed(2));
-      io.emit('robot-data', { ...latestRobotData });
-    }
-
-    // VFRHUD — fallback depth if SCALED_PRESSURE not available
-    if (data.alt !== undefined && data.groundspeed !== undefined && !surfacePressure) {
-      latestRobotData.depth = Number((-data.alt).toFixed(2));
-      io.emit('robot-data', { ...latestRobotData });
     }
   } catch (e) {}
 });
@@ -406,8 +388,20 @@ io.on('connection', socket=>{
     socket.emit('calibration-saved');
   });
 
+  socket.on('set-armed', (state) => {
+    isArmed = !!state;
+    if (!isArmed) {
+      const neutral = [1500,1500,1500,1500,1500,1500];
+      latestRobotData.thrusters = neutral;
+      sendToTeensy(neutral, armData);
+      io.emit('thruster-pwm', neutral);
+    }
+    console.log(isArmed ? '🟢 ARMED' : '🔴 DISARMED');
+  });
+
   socket.on('joystick-input', data=>{
     latestJoystick = data;
+    if (!isArmed) return;
 
     const thrusters = mixThrusters(data);
     latestRobotData.thrusters = thrusters;
@@ -420,10 +414,30 @@ io.on('connection', socket=>{
   socket.on('arm-control', data=>{
     armData = {...data};
 
-    sendToTeensy(latestRobotData.thrusters, armData);
+    const thrusters = isArmed ? latestRobotData.thrusters : [1500,1500,1500,1500,1500,1500];
+    sendToTeensy(thrusters, armData);
 
     io.emit('arm-update', armData);
   });
+});
+
+/* ================= TEENSY TELEMETRY (roll + depth) ================= */
+const TEENSY_TELEMETRY_PORT = 5000;
+const teensyTelemetry = dgram.createSocket('udp4');
+
+teensyTelemetry.on('message', (raw) => {
+  try {
+    const telemetry = JSON.parse(raw.toString().trim());
+    if (!Array.isArray(telemetry) || telemetry.length < 2) return;
+    const [roll, depth] = telemetry;
+    if (!isNaN(roll))  latestRobotData.roll  = Number(roll.toFixed(1));
+    if (!isNaN(depth)) latestRobotData.depth = Number(Math.max(0, depth).toFixed(2));
+    io.emit('robot-data', { ...latestRobotData });
+  } catch (e) {}
+});
+
+teensyTelemetry.bind(TEENSY_TELEMETRY_PORT, '0.0.0.0', () => {
+  console.log(`📡 Teensy telemetry listening on port ${TEENSY_TELEMETRY_PORT}`);
 });
 
 /* ================= START ================= */

@@ -1,6 +1,10 @@
 #include <Servo.h>
 #include <NativeEthernet.h>
 #include <NativeEthernetUdp.h>
+#include <Wire.h>
+#include <Adafruit_ISM330DHCX.h>
+#include <MadgwickAHRS.h>
+#include <MS5837.h>
 
 // =====================================================
 // ETHERNET CONFIG
@@ -8,32 +12,53 @@
 
 byte mac[] = { 0x04, 0xE9, 0xE5, 0x12, 0x34, 0x56 };
 
-IPAddress teensyIP(192,168,2,177);
-unsigned int localPort = 5000;
+IPAddress teensyIP(192, 168, 2, 177);
 
-EthernetUDP Udp;
+// Control: surface -> Teensy
+unsigned int controlLocalPort = 5000;
+
+// Telemetry: Teensy -> surface
+unsigned int telemetryLocalPort = 5001;
+
+NativeEthernetUDP UdpControl;
+NativeEthernetUDP UdpTelem;
+
 char udpBuf[512];
 
+IPAddress surfaceIP(192, 168, 2, 1);
+unsigned int surfaceControlPort = 5000;
+unsigned int surfaceTelemetryPort = 5001;
+
 // =====================================================
-// CONFIG
+// IMU CONFIG
 // =====================================================
 
-// Thrusters
-const uint8_t THRUSTER_PINS[] = {8, 7, 6, 5, 4, 3};
+Adafruit_ISM330DHCX ism;
+Madgwick filter;
 
-// Motor drivers actually USED
-const uint8_t MOTOR_DRIVER_PINS[] = {
-    26,27,31,
-    32,34,35
-};
+float roll = 0;
+float pitch = 0;
+float yaw = 0;
+float offAX = 0, offAY = 0, offAZ = 0;
+unsigned long lastUpdate = 0;
+bool imuOk = false;
 
-// Relays used
-const uint8_t RELAY_PINS[] = {15,20,21,22};
+// =====================================================
+// BAR30 CONFIG
+// =====================================================
+
+MS5837 bar30;
+float depth = 0;
+bool barOk = false;
+
+// =====================================================
+// HARDWARE CONFIG
+// =====================================================
+
+const uint8_t RELAY_PINS[] = {15, 20, 21, 22};
 
 const uint8_t NUM_THRUSTERS = 6;
-const uint8_t NUM_MOTORS = 6;
 const uint8_t NUM_RELAYS = 4;
-
 const uint8_t TOTAL = 12;
 
 // =====================================================
@@ -41,25 +66,48 @@ const uint8_t TOTAL = 12;
 // =====================================================
 
 Servo ch[TOTAL];
-
 int target[TOTAL];
-
 unsigned long lastPacket = 0;
 
 // =====================================================
 // RELAY STATE
 // =====================================================
 
-bool relayState[NUM_RELAYS] = {0,0,0,0};
+bool relayState[NUM_RELAYS] = {0, 0, 0, 0};
+
+// =====================================================
+// LOG BUFFER
+// =====================================================
+
+const int LOG_LINES = 48;
+String logQ[LOG_LINES];
+volatile uint8_t logHead = 0;
+volatile uint8_t logTail = 0;
+
+void logMsg(const String &s) {
+  uint8_t next = (logHead + 1) % LOG_LINES;
+  if (next == logTail) return;
+  logQ[logHead] = s;
+  logHead = next;
+}
+
+void flushLogs() {
+  int sent = 0;
+  while (logTail != logHead && Serial.availableForWrite() > 48 && sent < 4) {
+    Serial.println(logQ[logTail]);
+    logTail = (logTail + 1) % LOG_LINES;
+    sent++;
+  }
+}
 
 // =====================================================
 // SAFETY
 // =====================================================
 
 int clampUS(int us) {
-    if (us < 1000) return 1000;
-    if (us > 2000) return 2000;
-    return us;
+  if (us < 1000) return 1000;
+  if (us > 2000) return 2000;
+  return us;
 }
 
 // =====================================================
@@ -67,23 +115,18 @@ int clampUS(int us) {
 // =====================================================
 
 void writeCH(int i, int us) {
+  if (i < 0 || i >= TOTAL) return;
+  target[i] = clampUS(us);
+}
 
-    if (i < 0 || i >= TOTAL) return;
-
-    us = clampUS(us);
-
-    target[i] = us;
-
-    if (ch[i].attached()) {
-        ch[i].writeMicroseconds(us);
-    }
+void refreshESCs() {
+  for (int i = 0; i < TOTAL; i++) {
+    if (ch[i].attached()) ch[i].writeMicroseconds(target[i]);
+  }
 }
 
 void setAll(int us) {
-
-    for (int i = 0; i < TOTAL; i++) {
-        writeCH(i, us);
-    }
+  for (int i = 0; i < TOTAL; i++) writeCH(i, us);
 }
 
 // =====================================================
@@ -91,225 +134,133 @@ void setAll(int us) {
 // =====================================================
 
 void writeRelay(int i, bool state) {
-
-    if (i < 0 || i >= NUM_RELAYS) return;
-
-    relayState[i] = state;
-
-    digitalWrite(RELAY_PINS[i], state ? LOW : HIGH);
+  if (i < 0 || i >= NUM_RELAYS) return;
+  relayState[i] = state;
+  digitalWrite(RELAY_PINS[i], state ? LOW : HIGH);   // active-low
 }
 
 void allRelaysOff() {
-
-    for (int i = 0; i < NUM_RELAYS; i++) {
-        writeRelay(i, LOW);
-    }
+  for (int i = 0; i < NUM_RELAYS; i++) writeRelay(i, false);
 }
 
 // =====================================================
-// SERIAL PARSER (OLD SUPPORT KEPT)
+// SERIAL PARSER
 // =====================================================
 
 String serialBuf = "";
 
 void processSerial(String s) {
+  s.trim();
+  if (s.length() == 0) return;
 
-    s.trim();
+  lastPacket = millis();
 
-    if (s.length() == 0) return;
-
-    lastPacket = millis();
-
-    // =============================================
-    // ARRAY MODE
-    // =============================================
-
-    if (s.indexOf(',') >= 0) {
-
-        int v[TOTAL];
-        int n = 0;
-
-        char c[s.length() + 1];
-
-        s.toCharArray(c, sizeof(c));
-
-        char *t = strtok(c, ",");
-
-        while (t && n < TOTAL) {
-            v[n++] = atoi(t);
-            t = strtok(NULL, ",");
-        }
-
-        if (n == TOTAL) {
-
-            for (int i = 0; i < TOTAL; i++) {
-                writeCH(i, v[i]);
-            }
-        }
-
-        return;
+  if (s.indexOf(',') >= 0) {
+    int v[TOTAL];
+    int n = 0;
+    char c[s.length() + 1];
+    s.toCharArray(c, sizeof(c));
+    char *t = strtok(c, ",");
+    while (t && n < TOTAL) {
+      v[n++] = atoi(t);
+      t = strtok(NULL, ",");
     }
-
-    // =============================================
-    // COMMAND MODE
-    // =============================================
-
-    char cmd[10];
-    int val;
-
-    if (sscanf(s.c_str(), "%9s %d", cmd, &val) >= 2) {
-
-        // Thrusters
-        if (cmd[0] == 'T') {
-            writeCH(atoi(&cmd[1]) - 1, val);
-        }
-
-        // Motor Drivers
-        else if (cmd[0] == 'M' && cmd[1] == 'D') {
-            writeCH(atoi(&cmd[2]) - 1 + NUM_THRUSTERS, val);
-        }
-
-        // All ESCs
-        else if (strcmp(cmd, "ALL") == 0) {
-            setAll(val);
-        }
-
-        // Relays
-        else if (cmd[0] == 'R') {
-            int idx = atoi(&cmd[1]) - 1;
-            writeRelay(idx, val);
-        }
+    if (n == TOTAL) {
+      for (int i = 0; i < TOTAL; i++) writeCH(i, v[i]);
+      logMsg("[RX SERIAL] 12 PWM values applied");
+    } else {
+      logMsg(String("[RX SERIAL] invalid PWM count = ") + n);
     }
+    return;
+  }
+
+  char cmd[10];
+  int val;
+  if (sscanf(s.c_str(), "%9s %d", cmd, &val) >= 2) {
+    if (cmd[0] == 'T') writeCH(atoi(&cmd[1]) - 1, val);
+    else if (cmd[0] == 'M' && cmd[1] == 'D') writeCH(atoi(&cmd[2]) - 1 + NUM_THRUSTERS, val);
+    else if (strcmp(cmd, "ALL") == 0) setAll(val);
+    else if (cmd[0] == 'R') writeRelay(atoi(&cmd[1]) - 1, val);
+
+    logMsg(String("[RX SERIAL] ") + s);
+  }
 }
 
 void readSerial() {
-
-    while (Serial.available()) {
-
-        char c = Serial.read();
-
-        if (c == '\n' || c == '\r') {
-
-            processSerial(serialBuf);
-
-            serialBuf = "";
-
-        } else {
-
-            serialBuf += c;
-
-            if (serialBuf.length() > 200)
-                serialBuf = "";
-        }
+  while (Serial.available()) {
+    char c = Serial.read();
+    if (c == '\n' || c == '\r') {
+      processSerial(serialBuf);
+      serialBuf = "";
+    } else {
+      serialBuf += c;
+      if (serialBuf.length() > 200) serialBuf = "";
     }
+  }
 }
 
 // =====================================================
-// UDP JSON PARSER
+// UDP CONTROL PARSER
+// Expected: {"pwms":[t1,t2,t3,t4,t5,t6,md1,md2,md3,r1,r2,md4,md5,md6,r3,r4]}
 // =====================================================
 
-void processUDP(char* msg) {
+void processControlUDP(char* msg) {
+  char* p = strstr(msg, "\"pwms\":[");
+  if (!p) return;
 
-    char* p = strstr(msg, "\"pwms\":[");
+  p += strlen("\"pwms\":[");
 
-    if (!p) {
-        Serial.println("No pwms field");
-        return;
-    }
+  int values[16];
+  int count = 0;
 
-    p += strlen("\"pwms\":[");
+  while (*p && *p != ']' && count < 16) {
+    values[count++] = atoi(p);
+    while (*p && *p != ',' && *p != ']') p++;
+    if (*p == ',') p++;
+  }
 
-    int values[16];
-    int count = 0;
+  if (count != 16) {
+    logMsg(String("[RX CTRL] invalid PWM count: ") + count);
+    return;
+  }
 
-    while (*p && *p != ']' && count < 16) {
+  lastPacket = millis();
 
-        values[count++] = atoi(p);
+  for (int i = 0; i < 6; i++) writeCH(i, values[i]);
+  for (int i = 0; i < 3; i++) writeCH(6 + i, values[6 + i]);
+  for (int i = 0; i < 2; i++) writeRelay(i, values[9 + i]);
+  for (int i = 0; i < 3; i++) writeCH(9 + i, values[11 + i]);
+  for (int i = 0; i < 2; i++) writeRelay(2 + i, values[14 + i]);
 
-        while (*p && *p != ',' && *p != ']') {
-            p++;
-        }
-
-        if (*p == ',') p++;
-    }
-
-    if (count != 16) {
-        Serial.print("Invalid PWM packet count: ");
-        Serial.println(count);
-        return;
-    }
-
-    lastPacket = millis();
-
-    // ============================================
-    // THRUSTERS (0-5)
-    // ============================================
-    Serial.println("=== THRUSTERS ===");
-    for (int i = 0; i < 6; i++) {
-        writeCH(i, values[i]);
-        Serial.print("T"); Serial.print(i + 1); Serial.print(": "); Serial.println(values[i]);
-    }
-
-    // ============================================
-    // MOTOR DRIVERS SET 1 (6-8)
-    // ============================================
-    Serial.println("=== MOTOR DRIVERS 1 ===");
-    for (int i = 0; i < 3; i++) {
-        writeCH(6 + i, values[6 + i]);
-        Serial.print("MD"); Serial.print(i + 1); Serial.print(": "); Serial.println(values[6 + i]);
-    }
-
-    // ============================================
-    // RELAYS SET 1 (9-10)
-    // ============================================
-    Serial.println("=== RELAYS 1 ===");
-    for (int i = 0; i < 2; i++) {
-        writeRelay(i, values[9 + i]);
-        Serial.print("R"); Serial.print(i + 1); Serial.print(": "); Serial.println(values[9 + i]);
-    }
-
-    // ============================================
-    // MOTOR DRIVERS SET 2 (11-13)
-    // ============================================
-    Serial.println("=== MOTOR DRIVERS 2 ===");
-    for (int i = 0; i < 3; i++) {
-        writeCH(9 + i, values[11 + i]);
-        Serial.print("MD"); Serial.print(4 + i); Serial.print(": "); Serial.println(values[11 + i]);
-    }
-
-    // ============================================
-    // RELAYS SET 2 (14-15)
-    // ============================================
-    Serial.println("=== RELAYS 2 ===");
-    for (int i = 0; i < 2; i++) {
-        writeRelay(2 + i, values[14 + i]);
-        Serial.print("R"); Serial.print(3 + i); Serial.print(": "); Serial.println(values[14 + i]);
-    }
-
-    Serial.println("=== PWM packet applied ===\n");
+  char ipBuf[24];
+  snprintf(ipBuf, sizeof(ipBuf), "%u.%u.%u.%u",
+           surfaceIP[0], surfaceIP[1], surfaceIP[2], surfaceIP[3]);
+  logMsg(String("[RX CTRL] PWM applied from ") + ipBuf);
 }
+
 // =====================================================
-// UDP RECEIVE
+// UDP RECEIVE CONTROL
 // =====================================================
 
-void readUDP() {
+void readControlUDP() {
+  int processed = 0;
+  const int maxPacketsPerLoop = 2;
 
-    int packetSize = Udp.parsePacket();
+  while (processed < maxPacketsPerLoop) {
+    int packetSize = UdpControl.parsePacket();
+    if (packetSize <= 0) break;
 
-    if (packetSize > 0) {
+    surfaceIP = UdpControl.remoteIP();
+    surfaceControlPort = UdpControl.remotePort();
 
-        int len = Udp.read(udpBuf, sizeof(udpBuf)-1);
-
-        if (len > 0) {
-
-            udpBuf[len] = 0;
-
-            Serial.print("Received: ");
-            Serial.println(udpBuf);
-
-            processUDP(udpBuf);
-        }
+    int len = UdpControl.read(udpBuf, sizeof(udpBuf) - 1);
+    if (len > 0) {
+      udpBuf[len] = 0;
+      processControlUDP(udpBuf);
     }
+
+    processed++;
+  }
 }
 
 // =====================================================
@@ -317,13 +268,93 @@ void readUDP() {
 // =====================================================
 
 void failsafe() {
+  if (millis() - lastPacket > 500) {
+    setAll(1500);
+    allRelaysOff();
+  }
+}
 
-    if (millis() - lastPacket > 500) {
+// =====================================================
+// IMU CALIBRATION
+// =====================================================
 
-        setAll(1500);
+void calibrateSensors() {
+  float sx = 0, sy = 0, sz = 0;
+  const int samples = 500;
 
-        allRelaysOff();
-    }
+  for (int i = 0; i < samples; i++) {
+    sensors_event_t a, g, t;
+    ism.getEvent(&a, &g, &t);
+    sx += a.acceleration.x;
+    sy += a.acceleration.y;
+    sz += a.acceleration.z;
+    Ethernet.maintain();
+    delay(2);
+  }
+
+  offAX = sx / samples;
+  offAY = sy / samples;
+  offAZ = (sz / samples) - 9.80665f;
+}
+
+// =====================================================
+// IMU READ
+// =====================================================
+
+void readIMU() {
+  if (!imuOk) return;
+
+  sensors_event_t accel, gyro, temp;
+  if (!ism.getEvent(&accel, &gyro, &temp)) return;
+
+  unsigned long now = micros();
+  float dt = (now - lastUpdate) / 1000000.0f;
+  lastUpdate = now;
+  if (dt <= 0 || dt > 0.1f) dt = 0.01f;
+
+  filter.updateIMU(
+    gyro.gyro.x * 57.2958f,
+    gyro.gyro.y * 57.2958f,
+    gyro.gyro.z * 57.2958f,
+    accel.acceleration.x,
+    accel.acceleration.y,
+    accel.acceleration.z
+  );
+
+  roll = filter.getRoll();
+  pitch = filter.getPitch();
+  yaw = filter.getYaw();
+}
+
+// =====================================================
+// BAR30 READ
+// =====================================================
+
+void readDepth() {
+  if (!barOk) return;
+  bar30.read();
+  depth = bar30.depth();
+}
+
+// =====================================================
+// SEND TELEMETRY
+// Format: [roll,pitch,yaw,depth]
+// =====================================================
+
+void sendTelemetry() {
+  char outBuf[96];
+  snprintf(outBuf, sizeof(outBuf),
+           "[%.2f,%.2f,%.2f,%.3f]\n",
+           imuOk ? roll : 0.0f,
+           imuOk ? pitch : 0.0f,
+           imuOk ? yaw : 0.0f,
+           barOk ? depth : 0.0f);
+
+  UdpTelem.beginPacket(surfaceIP, surfaceTelemetryPort);
+  UdpTelem.write((uint8_t*)outBuf, strlen(outBuf));
+  UdpTelem.endPacket();
+
+  logMsg(String("[TX TELEM] ") + outBuf);
 }
 
 // =====================================================
@@ -331,70 +362,80 @@ void failsafe() {
 // =====================================================
 
 void setup() {
+  Serial.begin(115200);
+  while (!Serial && millis() < 4000) {}
+  Serial.println("Serial OK");
 
-    Serial.begin(115200);
+  Serial.println("Starting Ethernet...");
+  Ethernet.begin(mac, teensyIP);
+  delay(500);
 
-    while (!Serial && millis() < 4000) {}
+  UdpControl.begin(controlLocalPort);
+  UdpTelem.begin(telemetryLocalPort);
 
-    Serial.println("BOOTING ESC + RELAY + ETHERNET SYSTEM");
+  Serial.print("Teensy IP: ");
+  Serial.println(Ethernet.localIP());
+  Serial.print("Listening control UDP port: ");
+  Serial.println(controlLocalPort);
+  Serial.print("Telemetry UDP local port: ");
+  Serial.println(telemetryLocalPort);
+  Serial.println("Ethernet OK.");
 
-    // =================================================
-    // ETHERNET INIT
-    // =================================================
+  Wire.begin();
+  Wire.setClock(400000);
 
-    Ethernet.begin(mac, teensyIP);
+  if (!ism.begin_I2C(0x6B)) {
+    Serial.println("WARNING: ISM330DHCX not found — roll/pitch/yaw will send 0.00");
+    imuOk = false;
+  } else {
+    ism.setAccelRange(LSM6DS_ACCEL_RANGE_2_G);
+    ism.setGyroRange(LSM6DS_GYRO_RANGE_250_DPS);
+    filter.begin(100);
+    Serial.println("Calibrating IMU... do not move.");
+    calibrateSensors();
+    imuOk = true;
+    lastUpdate = micros();
+    Serial.println("IMU online.");
+    logMsg("IMU online");
+  }
 
-    delay(1000);
+  if (!bar30.init()) {
+    Serial.println("WARNING: Bar30 not found — depth will send 0.000");
+    barOk = false;
+  } else {
+    bar30.setModel(MS5837::MS5837_30BA);
+    bar30.setFluidDensity(997.0f);
+    barOk = true;
+    Serial.println("Bar30 online.");
+    logMsg("Bar30 online");
+  }
 
-    Serial.print("Teensy IP: ");
-    Serial.println(Ethernet.localIP());
+  uint8_t pins[TOTAL] = {
+    8, 7, 6, 5, 4, 3,
+    26, 27, 31,
+    32, 34, 35
+  };
 
-    Udp.begin(localPort);
+  for (int i = 0; i < TOTAL; i++) {
+    ch[i].attach(pins[i], 1000, 2000);
+    ch[i].writeMicroseconds(1500);
+    target[i] = 1500;
+    delay(20);
+  }
 
-    Serial.print("Listening UDP port: ");
-    Serial.println(localPort);
+  for (int i = 0; i < NUM_RELAYS; i++) {
+    pinMode(RELAY_PINS[i], OUTPUT);
+    digitalWrite(RELAY_PINS[i], HIGH);
+  }
 
-    // =================================================
-    // ESC INIT
-    // =================================================
+  delay(2000);
+  setAll(1500);
+  allRelaysOff();
+  refreshESCs();
+  lastPacket = millis();
 
-    uint8_t pins[TOTAL] = {
-        8,7,6,5,4,3,
-        26,27,31,
-        32,34,35
-    };
-
-    for (int i = 0; i < TOTAL; i++) {
-
-        ch[i].attach(pins[i], 1000, 2000);
-
-        ch[i].writeMicroseconds(1500);
-
-        target[i] = 1500;
-
-        delay(20);
-    }
-
-    // =================================================
-    // RELAY INIT
-    // =================================================
-
-    for (int i = 0; i < NUM_RELAYS; i++) {
-
-        pinMode(RELAY_PINS[i], OUTPUT);
-
-        digitalWrite(RELAY_PINS[i], LOW);
-    }
-
-    delay(2000);
-
-    setAll(1500);
-
-    allRelaysOff();
-
-    lastPacket = millis();
-
-    Serial.println("READY");
+  Serial.println("READY");
+  logMsg("READY");
 }
 
 // =====================================================
@@ -402,21 +443,41 @@ void setup() {
 // =====================================================
 
 void loop() {
+  Ethernet.maintain();
 
-    readSerial();
+  // Highest priority: incoming control
+  readSerial();
+  readControlUDP();
+  failsafe();
 
-    readUDP();
+  unsigned long now = millis();
 
-    failsafe();
+  // Keep PWM smooth and steady
+  static unsigned long escT = 0;
+  if (now - escT >= 20) {
+    escT = now;
+    refreshESCs();
+  }
 
-    static unsigned long t = 0;
+  // Sensor acquisition
+  static unsigned long sensorT = 0;
+  if (now - sensorT >= 20) {
+    sensorT = now;
+    readIMU();
+    readDepth();
+  }
 
-    if (millis() - t > 20) {
+  // Telemetry TX on separate socket/port
+  static unsigned long telemT = 0;
+  if (now - telemT >= 100) {
+    telemT = now;
+    sendTelemetry();
+  }
 
-        t = millis();
-
-        for (int i = 0; i < TOTAL; i++) {
-            ch[i].writeMicroseconds(target[i]);
-        }
-    }
+  // Serial logs, but bounded so they don't stall control
+  static unsigned long logT = 0;
+  if (now - logT >= 10) {
+    logT = now;
+    flushLogs();
+  }
 }

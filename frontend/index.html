@@ -5,50 +5,50 @@
   <title>Jalpari Mission Control v8</title>
   <script src="/socket.io/socket.io.js"></script>
   <style>
-    html, body { margin: 0; padding: 0; height: 100%; background: #0f172a; color: #f8fafc; font-family: 'Segoe UI', sans-serif; }
+    html, body { margin: 0; padding: 0; height: 100%; background: #150e2e; color: #f8fafc; font-family: 'Segoe UI', sans-serif; }
     body { overflow: hidden; }
     * { box-sizing: border-box; }
     .main-layout { display: grid; grid-template-columns: 320px 1fr 340px; gap: 12px; height: 100vh; padding: 10px; min-width: 0; }
-    .card { background: #1e293b; padding: 10px; border-radius: 8px; border: 1px solid #334155; }
+    .card { background: #1e1240; padding: 10px; border-radius: 8px; border: 1px solid #3d2972; }
     .column { display: flex; flex-direction: column; gap: 10px; height: 100%; min-height: 0; }
     .left-column { overflow-y: auto; padding-right: 4px; min-height: 0; }
     .right-column { overflow-y: auto; padding-left: 4px; min-height: 0; }
 
     .dual-gimbals { display: flex; justify-content: space-between; gap: 10px; padding: 10px 0; }
     .gimbal-wrap { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 5px; }
-    .gimbal-label { font-size: 10px; color: #94a3b8; text-transform: uppercase; font-weight: bold; }
-    .trackpad { width: 100%; aspect-ratio: 1 / 1; border-radius: 50%; border: 2px solid #334155; background: radial-gradient(circle at center, #1e293b, #0f172a); position: relative; overflow: hidden; box-shadow: inset 0 0 15px rgba(0,0,0,0.5); }
-    .trackpad::before, .trackpad::after { content: ""; position: absolute; background: #334155; }
+    .gimbal-label { font-size: 10px; color: #b0a0cc; text-transform: uppercase; font-weight: bold; }
+    .trackpad { width: 100%; aspect-ratio: 1 / 1; border-radius: 50%; border: 2px solid #3d2972; background: radial-gradient(circle at center, #1e1240, #150e2e); position: relative; overflow: hidden; box-shadow: inset 0 0 15px rgba(0,0,0,0.5); }
+    .trackpad::before, .trackpad::after { content: ""; position: absolute; background: #3d2972; }
     .trackpad::before { left: 50%; top: 0; width: 2px; height: 100%; transform: translateX(-50%); }
     .trackpad::after { top: 50%; left: 0; width: 100%; height: 2px; transform: translateY(-50%); }
-    .joystick-dot { position: absolute; left: 50%; top: 50%; width: 18px; height: 18px; border-radius: 50%; background: #38bdf8; box-shadow: 0 0 10px #38bdf8; transform: translate(-50%, -50%); pointer-events: none; transition: transform 0.05s linear; z-index: 2; }
+    .joystick-dot { position: absolute; left: 50%; top: 50%; width: 18px; height: 18px; border-radius: 50%; background: #c4b5fd; box-shadow: 0 0 10px #c4b5fd; transform: translate(-50%, -50%); pointer-events: none; transition: transform 0.05s linear; z-index: 2; }
     .joystick-dot.right-stick { background: #facc15; box-shadow: 0 0 10px #facc15; }
 
-    .heave-yaw-display { width: 100%; aspect-ratio: 1 / 1; border-radius: 12px; border: 2px solid #334155; background: #0b1221; position: relative; overflow: hidden; display: flex; align-items: center; justify-content: center; perspective: 600px; }
-    .heave-yaw-display::before { content: ""; position: absolute; width: 100%; height: 2px; background: #1e293b; top: 50%; left: 0; transform: translateY(-50%); }
-    .heave-yaw-display::after { content: "SURFACE"; position: absolute; top: 4px; font-size: 8px; color: #475569; letter-spacing: 2px; }
+    .heave-yaw-display { width: 100%; aspect-ratio: 1 / 1; border-radius: 12px; border: 2px solid #3d2972; background: #0d0820; position: relative; overflow: hidden; display: flex; align-items: center; justify-content: center; perspective: 600px; }
+    .heave-yaw-display::before { content: ""; position: absolute; width: 100%; height: 2px; background: #1e1240; top: 50%; left: 0; transform: translateY(-50%); }
+    .heave-yaw-display::after { content: "SURFACE"; position: absolute; top: 4px; font-size: 8px; color: #5b3d8a; letter-spacing: 2px; }
 
     .tiny-rov { position: relative; width: 40px; height: 60px; transition: transform 0.05s linear; z-index: 5; transform-style: preserve-3d; }
     .tiny-rov-body { position: absolute; top: 10%; left: 10%; width: 80%; height: 80%; background: linear-gradient(to bottom, #facc15, #ca8a04); border-radius: 6px; z-index: 2; box-shadow: 0 5px 15px rgba(0,0,0,0.6); transform-style: preserve-3d; }
     .tiny-rov-nose { position: absolute; top: -5px; left: 50%; transform: translateX(-50%) translateZ(10px); width: 16px; height: 8px; background: #f97316; border-radius: 4px 4px 0 0; z-index: 3; box-shadow: 0 0 8px #f97316; }
-    .tiny-rov-dome { position: absolute; top: 30%; left: 50%; transform: translate(-50%, -50%) translateZ(15px); width: 14px; height: 14px; background: #38bdf8; border-radius: 50%; z-index: 4; border: 2px solid #0f172a; box-shadow: inset -2px -2px 4px rgba(0,0,0,0.5); }
-    .tiny-rov-prop { position: absolute; width: 10px; height: 16px; background: #334155; border-radius: 4px; z-index: 1; border: 1px solid #475569; }
+    .tiny-rov-dome { position: absolute; top: 30%; left: 50%; transform: translate(-50%, -50%) translateZ(15px); width: 14px; height: 14px; background: #c4b5fd; border-radius: 50%; z-index: 4; border: 2px solid #150e2e; box-shadow: inset -2px -2px 4px rgba(0,0,0,0.5); }
+    .tiny-rov-prop { position: absolute; width: 10px; height: 16px; background: #3d2972; border-radius: 4px; z-index: 1; border: 1px solid #5b3d8a; }
     .tiny-rov-prop.tl { top: 0px; left: -6px; }
     .tiny-rov-prop.tr { top: 0px; right: -6px; }
     .tiny-rov-prop.bl { bottom: 0px; left: -6px; }
     .tiny-rov-prop.br { bottom: 0px; right: -6px; }
 
     .rov-map-container { display: flex; justify-content: center; padding: 15px 0; }
-    .rov-hull { width: 120px; height: 180px; border: 2px solid #475569; border-radius: 20px; position: relative; background: rgba(15, 23, 42, 0.5); }
+    .rov-hull { width: 120px; height: 180px; border: 2px solid #5b3d8a; border-radius: 20px; position: relative; background: rgba(15, 23, 42, 0.5); }
     .rov-nose { position: absolute; top: -10px; left: 50%; transform: translateX(-50%); width: 40px; height: 10px; background: #f97316; border-radius: 5px 5px 0 0; z-index: 3; box-shadow: 0 0 10px #f97316; }
-    .thruster-node { position: absolute; width: 24px; height: 36px; background: #334155; border-radius: 6px; border: 2px solid #1e293b; transition: background-color 0.1s linear, box-shadow 0.1s linear; display: flex; align-items: center; justify-content: center; font-size: 9px; font-weight: bold; color: rgba(255,255,255,0.4); }
+    .thruster-node { position: absolute; width: 24px; height: 36px; background: #3d2972; border-radius: 6px; border: 2px solid #1e1240; transition: background-color 0.1s linear, box-shadow 0.1s linear; display: flex; align-items: center; justify-content: center; font-size: 9px; font-weight: bold; color: rgba(255,255,255,0.4); }
     .node-fl { top: -10px; left: -15px; transform: rotate(-45deg); }
     .node-fr { top: -10px; right: -15px; transform: rotate(45deg); }
     .node-rl { bottom: -10px; left: -15px; transform: rotate(45deg); }
     .node-rr { bottom: -10px; right: -15px; transform: rotate(-45deg); }
     .node-vl { top: 50%; left: -18px; transform: translateY(-50%); border-radius: 50%; width: 30px; height: 30px; }
     .node-vr { top: 50%; right: -18px; transform: translateY(-50%); border-radius: 50%; width: 30px; height: 30px; }
-    .pwm-label { position: absolute; font-size: 8px; font-family: monospace; font-weight: bold; color: #94a3b8; white-space: nowrap; }
+    .pwm-label { position: absolute; font-size: 8px; font-family: monospace; font-weight: bold; color: #b0a0cc; white-space: nowrap; }
     #pwmFL { top: 8px; left: 6px; }
     #pwmFR { top: 8px; right: 6px; }
     #pwmRL { bottom: 8px; left: 6px; }
@@ -59,89 +59,94 @@
     .box-grid { display: grid; gap: 10px; }
     .box-grid-2x2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .box-grid-3x2 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-    .value-box { background: #08111f; border: 1px solid #23314c; border-radius: 10px; padding: 10px; min-height: 60px; text-align: center; }
-    .value-box .value { font-size: 18px; font-weight: 700; color: #38bdf8; font-family: Consolas, monospace; margin-top: 4px;}
+    .value-box { background: #0d0822; border: 1px solid #23314c; border-radius: 10px; padding: 10px; min-height: 60px; text-align: center; }
+    .value-box .value { font-size: 18px; font-weight: 700; color: #c4b5fd; font-family: Consolas, monospace; margin-top: 4px;}
     .camera-grid { display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: repeat(2, minmax(120px, 1fr)); gap: 8px; height: 100%; min-height: 0; }
-    .video-box { background: #000; border: 2px solid #475569; border-radius: 4px; display: flex; align-items: center; justify-content: center; position: relative; color: #475569; font-weight: bold; font-size: 12px; min-height: 120px; }
-    .cam-tag { position: absolute; top: 8px; left: 8px; background: rgba(0,0,0,0.7); font-size: 10px; padding: 3px 8px; color: #38bdf8; border-radius: 2px; }
+    .video-box { background: #000; border: 2px solid #5b3d8a; border-radius: 4px; display: flex; align-items: center; justify-content: center; position: relative; color: #5b3d8a; font-weight: bold; font-size: 12px; min-height: 120px; }
+    .cam-tag { position: absolute; top: 8px; left: 8px; background: rgba(0,0,0,0.7); font-size: 10px; padding: 3px 8px; color: #c4b5fd; border-radius: 2px; }
     .camera-column { display: flex; flex-direction: column; min-height: 0; }
-    .compass { width: 100px; height: 100px; border: 3px solid #38bdf8; border-radius: 50%; position: relative; margin: 8px auto; background: #000; overflow: hidden; }
+    .compass { width: 100px; height: 100px; border: 3px solid #c4b5fd; border-radius: 50%; position: relative; margin: 8px auto; background: #000; overflow: hidden; }
     .yaw-needle { width: 4px; height: 38px; background: #ef4444; position: absolute; left: 50%; bottom: 50%; transform-origin: bottom center; transition: transform 0.05s linear; }
     .horizon-wrap { width: 100%; height: 100%; position: absolute; top: 0; left: 0; overflow: hidden; border-radius: 50%; }
     .horizon-line { width: 90%; height: 2px; background: #22c55e; position: absolute; top: 50%; left: 50%; transform-origin: center center; transition: transform 0.05s linear; }
-    h3 { font-size: 11px; margin: 0 0 8px 0; color: #38bdf8; text-transform: uppercase; letter-spacing: 1px; border-bottom: 1px solid #334155; padding-bottom: 4px; }
-    .label { font-size: 10px; color: #94a3b8; text-transform: uppercase; }
-    .val-num { font-family: monospace; font-size: 18px; color: #38bdf8; font-weight: bold; }
+    h3 { font-size: 11px; margin: 0 0 8px 0; color: #c4b5fd; text-transform: uppercase; letter-spacing: 1px; border-bottom: 1px solid #3d2972; padding-bottom: 4px; }
+    .label { font-size: 10px; color: #b0a0cc; text-transform: uppercase; }
+    .val-num { font-family: monospace; font-size: 18px; color: #c4b5fd; font-weight: bold; }
     #conn { font-weight: bold; margin-left: 6px; }
     .dir-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 5px; margin-top: 5px; }
-    .dir-btn { padding: 4px; font-size: 10px; cursor: pointer; border: 1px solid #334155; border-radius: 3px; background: #334155; color: white; }
-    .sel-btn { padding: 4px; font-size: 10px; cursor: pointer; border: 1px solid #334155; border-radius: 3px; background: #334155; color: white; font-weight: bold; }
+    .dir-btn { padding: 4px; font-size: 10px; cursor: pointer; border: 1px solid #3d2972; border-radius: 3px; background: #3d2972; color: white; }
+    .sel-btn { padding: 4px; font-size: 10px; cursor: pointer; border: 1px solid #3d2972; border-radius: 3px; background: #3d2972; color: white; font-weight: bold; }
+    .arm-state-btn { flex: 1; padding: 8px; font-size: 12px; font-weight: bold; cursor: pointer; border-radius: 4px; border: 2px solid #5b3d8a; background: #3d2972; color: #b0a0cc; }
+    #btn-arm.active    { background: #16a34a; border-color: #22c55e; color: #fff; box-shadow: 0 0 8px #22c55e44; }
+    #btn-disarm.active { background: #b91c1c; border-color: #ef4444; color: #fff; box-shadow: 0 0 8px #ef444444; }
 
-    .arm-container { margin-top: 5px; }
-    .arm-section { margin-bottom: 12px; }
-    .arm-section-title { font-size: 10px; color: #38bdf8; font-weight: bold; margin-bottom: 6px; display: block; }
-    .arm-slider-row { display: flex; align-items: center; gap: 6px; margin-bottom: 5px; }
-    .arm-slider-label { font-size: 9px; color: #94a3b8; width: 60px; text-transform: uppercase; flex-shrink: 0; }
-    .arm-slider { flex: 1; height: 20px; -webkit-appearance: none; appearance: none; background: #08111f; border-radius: 3px; border: 1px solid #334155; outline: none; }
-    .arm-slider::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 14px; height: 14px; border-radius: 50%; background: #facc15; cursor: pointer; border: 2px solid #f97316; }
-    .arm-slider::-moz-range-thumb { width: 14px; height: 14px; border-radius: 50%; background: #facc15; cursor: pointer; border: 2px solid #f97316; }
-    .arm-slider-value { font-size: 9px; font-family: Consolas, monospace; color: #facc15; width: 45px; text-align: right; flex-shrink: 0; }
+    .arm-container { margin-top: 3px; }
+    .arm-section { margin-bottom: 6px; }
+    .arm-section-title { font-size: 10px; color: #c4b5fd; font-weight: bold; margin-bottom: 3px; display: block; }
+    .arm-slider-row { display: flex; align-items: center; gap: 4px; margin-bottom: 2px; }
+    .arm-slider-label { font-size: 9px; color: #b0a0cc; width: 60px; text-transform: uppercase; flex-shrink: 0; }
+    .arm-slider { flex: 1; min-width: 0; height: 15px; -webkit-appearance: none; appearance: none; background: #0d0822; border-radius: 3px; border: 1px solid #3d2972; outline: none; }
+    .arm-slider::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 13px; height: 13px; border-radius: 50%; background: #facc15; cursor: pointer; border: 2px solid #f97316; }
+    .arm-slider::-moz-range-thumb { width: 13px; height: 13px; border-radius: 50%; background: #facc15; cursor: pointer; border: 2px solid #f97316; }
+    .arm-slider-value { font-size: 9px; font-family: Consolas, monospace; color: #facc15; width: 38px; text-align: right; flex-shrink: 0; }
     .gripper-controls { display: flex; gap: 5px; }
-    .gripper-controls button { background: #334155; border: 1px solid #475569; color: white; padding: 8px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: bold; }
-    .gripper-controls button.active { background: #38bdf8; border-color: #38bdf8; box-shadow: 0 0 8px #38bdf8; }
+    .gripper-controls button { background: #3d2972; border: 1px solid #5b3d8a; color: white; padding: 5px 8px; border-radius: 4px; cursor: pointer; font-size: 10px; font-weight: bold; }
+    .gripper-controls button.active { background: #c4b5fd; border-color: #c4b5fd; box-shadow: 0 0 8px #c4b5fd; }
+    .rotate-pwm-btn { background: #3d2972; border: 1px solid #5b3d8a; color: #facc15; padding: 3px 5px; border-radius: 4px; cursor: pointer; font-size: 9px; font-weight: bold; flex-shrink: 0; }
+    .rotate-pwm-btn:active { background: #f97316; border-color: #f97316; }
 
     /* ====== SETTINGS BUTTON ====== */
-    .settings-btn { position: fixed; bottom: 16px; right: 16px; z-index: 100; background: #1e293b; border: 1px solid #334155; color: #94a3b8; padding: 7px 14px; border-radius: 6px; cursor: pointer; font-size: 11px; letter-spacing: 1px; }
-    .settings-btn:hover { border-color: #38bdf8; color: #38bdf8; }
+    .settings-btn { position: fixed; bottom: 16px; right: 16px; z-index: 100; background: #1e1240; border: 1px solid #3d2972; color: #b0a0cc; padding: 7px 14px; border-radius: 6px; cursor: pointer; font-size: 11px; letter-spacing: 1px; }
+    .settings-btn:hover { border-color: #c4b5fd; color: #c4b5fd; }
 
     /* ====== SETTINGS MODAL ====== */
     .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 200; align-items: flex-start; justify-content: center; padding: 20px; overflow-y: auto; }
     .modal-overlay.open { display: flex; }
-    .modal { background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 0; width: 620px; max-width: 100%; overflow: hidden; }
+    .modal { background: #1e1240; border: 1px solid #3d2972; border-radius: 12px; padding: 0; width: 620px; max-width: 100%; overflow: hidden; }
 
     /* Settings tabs */
-    .modal-tabs { display: flex; border-bottom: 1px solid #334155; }
-    .modal-tab { flex: 1; padding: 12px 8px; font-size: 11px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; cursor: pointer; background: transparent; border: none; color: #64748b; border-bottom: 2px solid transparent; margin-bottom: -1px; transition: color 0.15s, border-color 0.15s; }
-    .modal-tab:hover { color: #94a3b8; }
-    .modal-tab.active { color: #38bdf8; border-bottom-color: #38bdf8; }
+    .modal-tabs { display: flex; border-bottom: 1px solid #3d2972; }
+    .modal-tab { flex: 1; padding: 12px 8px; font-size: 11px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; cursor: pointer; background: transparent; border: none; color: #7c5cb5; border-bottom: 2px solid transparent; margin-bottom: -1px; transition: color 0.15s, border-color 0.15s; }
+    .modal-tab:hover { color: #b0a0cc; }
+    .modal-tab.active { color: #c4b5fd; border-bottom-color: #c4b5fd; }
 
     .modal-body { padding: 20px; max-height: 70vh; overflow-y: auto; }
-    .modal-title { font-size: 12px; color: #38bdf8; text-transform: uppercase; letter-spacing: 2px; margin: 0 0 4px 0; }
-    .modal-hint { font-size: 10px; color: #475569; margin: 0 0 14px 0; }
+    .modal-title { font-size: 12px; color: #c4b5fd; text-transform: uppercase; letter-spacing: 2px; margin: 0 0 4px 0; }
+    .modal-hint { font-size: 10px; color: #5b3d8a; margin: 0 0 14px 0; }
 
     /* Tab panels */
     .tab-panel { display: none; }
     .tab-panel.active { display: block; }
 
     /* Axis inversion rows */
-    .invert-section-title { font-size: 10px; color: #64748b; text-transform: uppercase; letter-spacing: 1px; margin: 14px 0 6px 0; padding-bottom: 4px; border-bottom: 1px solid #1e3a4a; }
-    .invert-row { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid #0f172a; }
-    .invert-label { flex: 1; font-size: 11px; color: #94a3b8; }
-    .invert-desc { font-size: 10px; color: #475569; width: 180px; }
-    .toggle-btn { width: 80px; padding: 5px 10px; font-size: 10px; font-weight: bold; text-transform: uppercase; border-radius: 4px; border: 1px solid #475569; background: #334155; color: #94a3b8; cursor: pointer; transition: all 0.15s; text-align: center; letter-spacing: 0.5px; }
+    .invert-section-title { font-size: 10px; color: #7c5cb5; text-transform: uppercase; letter-spacing: 1px; margin: 14px 0 6px 0; padding-bottom: 4px; border-bottom: 1px solid #3d2a6e; }
+    .invert-row { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid #150e2e; }
+    .invert-label { flex: 1; font-size: 11px; color: #b0a0cc; }
+    .invert-desc { font-size: 10px; color: #5b3d8a; width: 180px; }
+    .toggle-btn { width: 80px; padding: 5px 10px; font-size: 10px; font-weight: bold; text-transform: uppercase; border-radius: 4px; border: 1px solid #5b3d8a; background: #3d2972; color: #b0a0cc; cursor: pointer; transition: all 0.15s; text-align: center; letter-spacing: 0.5px; }
     .toggle-btn.reversed { background: #ef4444; border-color: #ef4444; color: #fff; box-shadow: 0 0 8px rgba(239,68,68,0.4); }
     .toggle-btn.normal { background: #22c55e; border-color: #22c55e; color: #000; box-shadow: 0 0 8px rgba(34,197,94,0.3); }
 
     /* Bindings */
-    .binding-section { font-size: 10px; color: #64748b; text-transform: uppercase; letter-spacing: 1px; margin: 12px 0 4px 0; }
-    .binding-row { display: flex; align-items: center; gap: 10px; padding: 7px 0; border-bottom: 1px solid #0f172a; }
-    .binding-label { flex: 1; font-size: 11px; color: #94a3b8; }
-    .binding-value { font-family: Consolas, monospace; font-size: 11px; color: #facc15; width: 110px; text-align: center; background: #0f172a; padding: 3px 6px; border-radius: 4px; border: 1px solid #1e3a4a; }
+    .binding-section { font-size: 10px; color: #7c5cb5; text-transform: uppercase; letter-spacing: 1px; margin: 12px 0 4px 0; }
+    .binding-row { display: flex; align-items: center; gap: 10px; padding: 7px 0; border-bottom: 1px solid #150e2e; }
+    .binding-label { flex: 1; font-size: 11px; color: #b0a0cc; }
+    .binding-value { font-family: Consolas, monospace; font-size: 11px; color: #facc15; width: 110px; text-align: center; background: #150e2e; padding: 3px 6px; border-radius: 4px; border: 1px solid #3d2a6e; }
     .binding-value.listening { color: #f97316; border-color: #f97316; animation: blink 0.7s infinite; }
     @keyframes blink { 0%,100% { opacity:1; } 50% { opacity:0.35; } }
-    .remap-btn { background: #334155; border: 1px solid #475569; color: #f8fafc; padding: 3px 10px; border-radius: 4px; cursor: pointer; font-size: 10px; white-space: nowrap; }
-    .remap-btn:hover { border-color: #38bdf8; }
+    .remap-btn { background: #3d2972; border: 1px solid #5b3d8a; color: #f8fafc; padding: 3px 10px; border-radius: 4px; cursor: pointer; font-size: 10px; white-space: nowrap; }
+    .remap-btn:hover { border-color: #c4b5fd; }
     .remap-btn.active { background: #f97316; border-color: #f97316; }
 
-    .modal-footer { display: flex; gap: 10px; padding: 14px 20px; border-top: 1px solid #334155; justify-content: flex-end; background: #1a2744; }
-    .modal-footer button { padding: 6px 16px; border-radius: 5px; border: 1px solid #334155; background: #0f172a; color: #f8fafc; cursor: pointer; font-size: 11px; }
-    .modal-close-btn { border-color: #38bdf8 !important; color: #38bdf8 !important; }
+    .modal-footer { display: flex; gap: 10px; padding: 14px 20px; border-top: 1px solid #3d2972; justify-content: flex-end; background: #1a1040; }
+    .modal-footer button { padding: 6px 16px; border-radius: 5px; border: 1px solid #3d2972; background: #150e2e; color: #f8fafc; cursor: pointer; font-size: 11px; }
+    .modal-close-btn { border-color: #c4b5fd !important; color: #c4b5fd !important; }
     .modal-reset-btn { color: #ef4444 !important; border-color: #ef4444 !important; }
     .modal-save-btn { border-color: #22c55e !important; color: #22c55e !important; }
 
     /* Info note */
-    .info-note { background: #0f172a; border: 1px solid #1e3a4a; border-radius: 6px; padding: 8px 12px; font-size: 10px; color: #475569; margin-bottom: 14px; line-height: 1.5; }
-    .info-note span { color: #38bdf8; }
+    .info-note { background: #150e2e; border: 1px solid #3d2a6e; border-radius: 6px; padding: 8px 12px; font-size: 10px; color: #5b3d8a; margin-bottom: 14px; line-height: 1.5; }
+    .info-note span { color: #c4b5fd; }
   </style>
 </head>
 <body>
@@ -149,23 +154,23 @@
     <div class="column left-column">
       <div class="card">
         <h3>SYSTEM MODIFIERS</h3>
-        <div id="gainModeTag" style="text-align:center;padding:4px 8px;margin-bottom:8px;border-radius:4px;font-size:10px;font-weight:bold;letter-spacing:1px;border:1px solid #38bdf8;color:#38bdf8;background:rgba(56,189,248,0.1);">EDITING: PRIMARY + SECONDARY</div>
+        <div id="gainModeTag" style="text-align:center;padding:4px 8px;margin-bottom:8px;border-radius:4px;font-size:10px;font-weight:bold;letter-spacing:1px;border:1px solid #c4b5fd;color:#c4b5fd;background:rgba(196,181,253,0.1);">EDITING: PRIMARY + SECONDARY</div>
         <div class="box-grid box-grid-2x2">
-          <div class="value-box" id="gainBoxPrimary" style="border-color:#38bdf8;">
+          <div class="value-box" id="gainBoxPrimary" style="border-color:#c4b5fd;">
             <div class="label">Primary</div>
-            <div class="value" id="valGain" style="color:#38bdf8;">50%</div>
+            <div class="value" id="valGain" style="color:#c4b5fd;">50%</div>
           </div>
           <div class="value-box" id="gainBoxSecondary" style="border-color:#a78bfa;">
             <div class="label">Secondary</div>
             <div class="value" id="valVGain" style="color:#a78bfa;">50%</div>
           </div>
-          <div class="value-box" id="gainBoxSway" style="border-color:#334155;">
+          <div class="value-box" id="gainBoxSway" style="border-color:#3d2972;">
             <div class="label">Sway</div>
-            <div class="value" id="valSwayGain" style="color:#94a3b8;">50%</div>
+            <div class="value" id="valSwayGain" style="color:#b0a0cc;">50%</div>
           </div>
-          <div class="value-box" id="gainBoxYaw" style="border-color:#334155;">
+          <div class="value-box" id="gainBoxYaw" style="border-color:#3d2972;">
             <div class="label">Yaw</div>
-            <div class="value" id="valYawGain" style="color:#94a3b8;">50%</div>
+            <div class="value" id="valYawGain" style="color:#b0a0cc;">50%</div>
           </div>
           <div class="value-box" style="border-color:#22c55e;grid-column:span 2;">
             <div class="label">Roll</div>
@@ -217,7 +222,7 @@
         <h3>ARM CONTROLS</h3>
         <div class="arm-container">
           <div class="arm-section">
-            <span class="arm-section-title">Arm 1</span>
+            <span class="arm-section-title">Right Arm</span>
             <div class="arm-slider-row">
               <div class="arm-slider-label">Slew</div>
               <input class="arm-slider" type="range" min="1000" max="2000" value="1500" id="arm1_slew">
@@ -230,7 +235,9 @@
             </div>
             <div class="arm-slider-row">
               <div class="arm-slider-label">Rotate</div>
+              <button class="rotate-pwm-btn" id="arm1_rotate_1100">1100</button>
               <input class="arm-slider" type="range" min="1000" max="2000" value="1500" id="arm1_rotate">
+              <button class="rotate-pwm-btn" id="arm1_rotate_1900">1900</button>
               <div class="arm-slider-value" id="arm1_rotate_val">1500</div>
             </div>
             <div class="arm-slider-row">
@@ -243,7 +250,7 @@
           </div>
 
           <div class="arm-section">
-            <span class="arm-section-title">Arm 2</span>
+            <span class="arm-section-title">Left Arm</span>
             <div class="arm-slider-row">
               <div class="arm-slider-label">Slew</div>
               <input class="arm-slider" type="range" min="1000" max="2000" value="1500" id="arm2_slew">
@@ -256,7 +263,9 @@
             </div>
             <div class="arm-slider-row">
               <div class="arm-slider-label">Rotate</div>
+              <button class="rotate-pwm-btn" id="arm2_rotate_1100">1100</button>
               <input class="arm-slider" type="range" min="1000" max="2000" value="1500" id="arm2_rotate">
+              <button class="rotate-pwm-btn" id="arm2_rotate_1900">1900</button>
               <div class="arm-slider-value" id="arm2_rotate_val">1500</div>
             </div>
             <div class="arm-slider-row">
@@ -301,15 +310,12 @@
 
       <div class="card">
         <div class="card">
-          <h3>DOF MODE</h3>
-          <div class="dir-grid" id="dof-mode-grid">
-            <button class="sel-btn" id="mbtn-surge" onclick="setMode('surge')">SURGE</button>
-            <button class="sel-btn" id="mbtn-sway"  onclick="setMode('sway')">SWAY</button>
-            <button class="sel-btn" id="mbtn-heave" onclick="setMode('heave')">HEAVE</button>
-            <button class="sel-btn" id="mbtn-yaw"   onclick="setMode('yaw')">YAW</button>
-            <button class="sel-btn" id="mbtn-pitch" onclick="setMode('pitch')">PITCH</button>
-            <button class="sel-btn" id="mbtn-roll"  onclick="setMode('roll')">ROLL</button>
+          <h3>THRUSTER ARM</h3>
+          <div style="display:flex; gap:8px; margin-top:5px;">
+            <button class="arm-state-btn active" id="btn-arm"    onclick="setArmed(true)">ARM</button>
+            <button class="arm-state-btn" id="btn-disarm" onclick="setArmed(false)">DISARM</button>
           </div>
+          <div style="font-size:9px; color:#7c5cb5; margin-top:5px;" id="arm-status-label">ARMED — thrusters active</div>
         </div>
         <div class="card">
           <h3>HOLD MODES</h3>
@@ -360,6 +366,7 @@
         <button class="modal-tab active" onclick="switchTab('tab-axes')">🎮 Axis Config</button>
         <button class="modal-tab" onclick="switchTab('tab-bindings')">🔗 Bindings</button>
         <button class="modal-tab" onclick="switchTab('tab-calib')">🔧 Calibration</button>
+        <button class="modal-tab" onclick="switchTab('tab-dof')">🎯 DOF Mode</button>
       </div>
 
       <div class="modal-body">
@@ -476,7 +483,22 @@
         <div class="tab-panel" id="tab-calib">
           <p class="modal-hint">Select thrusters to test individually. Toggle N/R to reverse. SAVE persists to disk.</p>
           <div class="dir-grid" id="dir-grid"></div>
-          <button onclick="saveCalibration()" id="calibSaveBtn" style="margin-top:6px; width:100%; padding:5px; font-size:11px; background:#1d4ed8; color:#fff; border:none; border-radius:4px; cursor:pointer;">SAVE</button>
+          <button onclick="saveCalibration()" id="calibSaveBtn" style="margin-top:6px; width:100%; padding:5px; font-size:11px; background:#6d28d9; color:#fff; border:none; border-radius:4px; cursor:pointer;">SAVE</button>
+        </div>
+
+        <!-- ===== TAB: DOF MODE ===== -->
+        <div class="tab-panel" id="tab-dof">
+          <div class="info-note">
+            Select which axes are active. When any mode is on, only those axes send thrust — all others are zeroed.
+          </div>
+          <div class="dir-grid" id="dof-mode-grid" style="margin-top:10px;">
+            <button class="sel-btn" id="mbtn-surge" onclick="setMode('surge')">SURGE</button>
+            <button class="sel-btn" id="mbtn-sway"  onclick="setMode('sway')">SWAY</button>
+            <button class="sel-btn" id="mbtn-heave" onclick="setMode('heave')">HEAVE</button>
+            <button class="sel-btn" id="mbtn-yaw"   onclick="setMode('yaw')">YAW</button>
+            <button class="sel-btn" id="mbtn-pitch" onclick="setMode('pitch')">PITCH</button>
+            <button class="sel-btn" id="mbtn-roll"  onclick="setMode('roll')">ROLL</button>
+          </div>
         </div>
 
       </div><!-- /modal-body -->
@@ -504,22 +526,22 @@
   socket.on('selection-update', (data) => {
     thrusterSelected[data.id] = data.selected;
     const btn = document.getElementById(`sbtn-${data.id}`);
-    btn.style.background = data.selected ? '#22c55e' : '#334155';
+    btn.style.background = data.selected ? '#22c55e' : '#3d2972';
     btn.style.color = data.selected ? '#000' : '#fff';
   });
 
   socket.on('direction-update', (data) => {
     const btn = document.getElementById(`dbtn-${data.id}`);
     btn.innerText = data.dir === 1 ? 'N' : 'R';
-    btn.style.background = data.dir === 1 ? '#334155' : '#ef4444';
+    btn.style.background = data.dir === 1 ? '#3d2972' : '#ef4444';
   });
 
   socket.on('calibration-state', ({ dirs, selected }) => {
     for (let id = 1; id <= 6; id++) {
       const dBtn = document.getElementById(`dbtn-${id}`);
       const sBtn = document.getElementById(`sbtn-${id}`);
-      if (dBtn) { dBtn.innerText = dirs[id] === 1 ? 'N' : 'R'; dBtn.style.background = dirs[id] === 1 ? '#334155' : '#ef4444'; }
-      if (sBtn) { sBtn.style.background = selected[id] ? '#22c55e' : '#334155'; sBtn.style.color = selected[id] ? '#000' : '#fff'; thrusterSelected[id] = selected[id]; }
+      if (dBtn) { dBtn.innerText = dirs[id] === 1 ? 'N' : 'R'; dBtn.style.background = dirs[id] === 1 ? '#3d2972' : '#ef4444'; }
+      if (sBtn) { sBtn.style.background = selected[id] ? '#22c55e' : '#3d2972'; sBtn.style.color = selected[id] ? '#000' : '#fff'; thrusterSelected[id] = selected[id]; }
     }
   });
 
@@ -622,6 +644,9 @@
   let modeSurgeWas=false, modeSwayWas=false, modeHeaveWas=false,
       modeYawWas=false, modePitchWas=false, modeRollWas=false;
   let depthHoldWas=false, rollHoldWas=false, stabilizeWas=false;
+  let arm1Rot1100Was=false, arm1Rot1900Was=false,
+      arm2Rot1100Was=false, arm2Rot1900Was=false;
+  let armBtnWas=false, disarmBtnWas=false;
 
   let offsetX = 0, offsetY = 0, offsetYaw = 0, offsetThrottle = 0;
   let btn8WasPressed = false;
@@ -678,10 +703,24 @@
     DOF_MODES.forEach(m => {
       const btn = document.getElementById(`mbtn-${m}`);
       if (btn) {
-        btn.style.background = activeModes.has(m) ? '#f59e0b' : '#334155';
+        btn.style.background = activeModes.has(m) ? '#f59e0b' : '#3d2972';
         btn.style.color      = activeModes.has(m) ? '#000'    : '#fff';
       }
     });
+  }
+
+  /* ============ ARM / DISARM ============ */
+  let isArmed = true;
+
+  function setArmed(state) {
+    socket.emit('set-armed', state);
+    isArmed = state;
+    document.getElementById('btn-arm').classList.toggle('active', state);
+    document.getElementById('btn-disarm').classList.toggle('active', !state);
+    document.getElementById('arm-status-label').textContent = state
+      ? 'ARMED — thrusters active'
+      : 'DISARMED — thrusters locked';
+    updateThrusters();
   }
 
   /* ============ HOLD MODES ============ */
@@ -727,7 +766,7 @@
     };
     for (const [id, active] of Object.entries(states)) {
       const btn = document.getElementById(id);
-      if (btn) { btn.style.background = active ? '#3b82f6' : '#334155'; btn.style.color = '#fff'; }
+      if (btn) { btn.style.background = active ? '#7c3aed' : '#3d2972'; btn.style.color = '#fff'; }
     }
   }
 
@@ -740,7 +779,10 @@
     axisHatX: 4, axisHatY: 5,
     btnModeSurge: -1, btnModeSway: -1, btnModeHeave: -1,
     btnModeYaw: -1, btnModePitch: -1, btnModeRoll: -1,
-    btnDepthHold: -1, btnRollHold: -1, btnStabilize: -1
+    btnDepthHold: -1, btnRollHold: -1, btnStabilize: -1,
+    btnArm1Rotate1100: -1, btnArm1Rotate1900: -1,
+    btnArm2Rotate1100: -1, btnArm2Rotate1900: -1,
+    btnArm: -1, btnDisarm: -1,
   };
 
   let bindings = JSON.parse(localStorage.getItem('gpBindings') || 'null') || {...DEFAULT_BINDINGS};
@@ -796,6 +838,14 @@
     { key: 'btnDepthHold', label: 'Depth Hold', type: 'button' },
     { key: 'btnRollHold',  label: 'Roll Hold',  type: 'button' },
     { key: 'btnStabilize', label: 'Stabilize',  type: 'button' },
+    { section: 'Arm Rotate' },
+    { key: 'btnArm1Rotate1100', label: 'Right Arm Rotate 1100', type: 'button' },
+    { key: 'btnArm1Rotate1900', label: 'Right Arm Rotate 1900', type: 'button' },
+    { key: 'btnArm2Rotate1100', label: 'Left Arm Rotate 1100',  type: 'button' },
+    { key: 'btnArm2Rotate1900', label: 'Left Arm Rotate 1900',  type: 'button' },
+    { section: 'Arm State' },
+    { key: 'btnArm',    label: 'ARM',    type: 'button' },
+    { key: 'btnDisarm', label: 'DISARM', type: 'button' },
   ];
 
   let remapTarget = null;
@@ -871,7 +921,7 @@
       element.style.backgroundColor = `rgba(239, 68, 68, ${0.4 + (intensity * 0.6)})`;
       element.style.boxShadow = `0 0 15px rgba(239, 68, 68, ${intensity})`;
     } else {
-      element.style.backgroundColor = '#334155';
+      element.style.backgroundColor = '#3d2972';
       element.style.boxShadow = 'none';
     }
     const label = document.getElementById(element.id.replace('vis', 'pwm'));
@@ -914,24 +964,24 @@
     const valSec  = document.getElementById('valVGain');
     if (gainMode === 'sway-yaw') {
       if (modeTag) { modeTag.textContent = 'EDITING: SWAY + YAW'; modeTag.style.borderColor = '#f59e0b'; modeTag.style.color = '#f59e0b'; modeTag.style.background = 'rgba(245,158,11,0.1)'; }
-      if (boxPri)  boxPri.style.borderColor  = '#334155';
-      if (boxSec)  boxSec.style.borderColor  = '#334155';
+      if (boxPri)  boxPri.style.borderColor  = '#3d2972';
+      if (boxSec)  boxSec.style.borderColor  = '#3d2972';
       if (boxSway) boxSway.style.borderColor = '#f59e0b';
       if (boxYaw)  boxYaw.style.borderColor  = '#f59e0b';
-      if (valPri)  valPri.style.color  = '#475569';
-      if (valSec)  valSec.style.color  = '#475569';
+      if (valPri)  valPri.style.color  = '#5b3d8a';
+      if (valSec)  valSec.style.color  = '#5b3d8a';
       if (valSway) valSway.style.color = '#f59e0b';
       if (valYaw)  valYaw.style.color  = '#f59e0b';
     } else {
-      if (modeTag) { modeTag.textContent = 'EDITING: PRIMARY + SECONDARY'; modeTag.style.borderColor = '#38bdf8'; modeTag.style.color = '#38bdf8'; modeTag.style.background = 'rgba(56,189,248,0.1)'; }
-      if (boxPri)  boxPri.style.borderColor  = '#38bdf8';
+      if (modeTag) { modeTag.textContent = 'EDITING: PRIMARY + SECONDARY'; modeTag.style.borderColor = '#c4b5fd'; modeTag.style.color = '#c4b5fd'; modeTag.style.background = 'rgba(196,181,253,0.1)'; }
+      if (boxPri)  boxPri.style.borderColor  = '#c4b5fd';
       if (boxSec)  boxSec.style.borderColor  = '#a78bfa';
-      if (boxSway) boxSway.style.borderColor = '#334155';
-      if (boxYaw)  boxYaw.style.borderColor  = '#334155';
-      if (valPri)  valPri.style.color  = '#38bdf8';
+      if (boxSway) boxSway.style.borderColor = '#3d2972';
+      if (boxYaw)  boxYaw.style.borderColor  = '#3d2972';
+      if (valPri)  valPri.style.color  = '#c4b5fd';
       if (valSec)  valSec.style.color  = '#a78bfa';
-      if (valSway) valSway.style.color = '#475569';
-      if (valYaw)  valYaw.style.color  = '#475569';
+      if (valSway) valSway.style.color = '#5b3d8a';
+      if (valYaw)  valYaw.style.color  = '#5b3d8a';
     }
 
     document.getElementById('valSurge').textContent = Math.round(-dispY * 100) + '%';
@@ -943,6 +993,11 @@
   }
 
   function updateThrusters() {
+    if (!isArmed) {
+      for (const k of Object.keys(visNodes)) styleThrusterNode(visNodes[k], 1500);
+      updateUIElements();
+      return;
+    }
     const any = activeModes.size > 0;
     const forward  = (stabilizeActive || (any && !activeModes.has('surge'))) ? 0 : -ny;
     const strafe   = (stabilizeActive || (any && !activeModes.has('sway')))  ? 0 : nx;
@@ -952,10 +1007,10 @@
     const roll     = rollHoldActive  ? rollCorrection
                    : (any && !activeModes.has('roll')  ? 0 : currentRoll);
 
-    let fl = forward + strafe + yaw;
-    let fr = forward - strafe - yaw;
-    let rl = forward + strafe - yaw;
-    let rr = forward - strafe + yaw;
+    let fl = forward + yaw + strafe;
+    let fr = forward - yaw - strafe;
+    let rl = forward + yaw - strafe;
+    let rr = forward - yaw + strafe;
 
     const max_h = Math.max(1.0, Math.abs(fl), Math.abs(fr), Math.abs(rl), Math.abs(rr));
     fl /= max_h; fr /= max_h; rl /= max_h; rr /= max_h;
@@ -976,6 +1031,7 @@
   }
 
   function emitJoystick() {
+    if (!isArmed) return;
     const any = activeModes.size > 0;
     const effX      = (stabilizeActive || (any && !activeModes.has('sway')))  ? 0 : nx;
     const effY      = (stabilizeActive || (any && !activeModes.has('surge'))) ? 0 : ny;
@@ -1130,6 +1186,26 @@
         if (bStab  && !stabilizeWas) setHoldMode('stabilize');
         depthHoldWas=bDepth; rollHoldWas=bRollH; stabilizeWas=bStab;
 
+        const bArmBtn=bp('btnArm'), bDisarmBtn=bp('btnDisarm');
+        if (bArmBtn    && !armBtnWas)    setArmed(true);
+        if (bDisarmBtn && !disarmBtnWas) setArmed(false);
+        armBtnWas=bArmBtn; disarmBtnWas=bDisarmBtn;
+
+        const bA1R1100 = bp('btnArm1Rotate1100');
+        const bA1R1900 = bp('btnArm1Rotate1900');
+        const bA2R1100 = bp('btnArm2Rotate1100');
+        const bA2R1900 = bp('btnArm2Rotate1900');
+        if (bA1R1100 && !arm1Rot1100Was) { document.getElementById('arm1_rotate').value = 1100; updateArmValue('arm1_rotate'); emitArmControls(); }
+        if (!bA1R1100 && arm1Rot1100Was) { document.getElementById('arm1_rotate').value = 1500; updateArmValue('arm1_rotate'); emitArmControls(); }
+        if (bA1R1900 && !arm1Rot1900Was) { document.getElementById('arm1_rotate').value = 1900; updateArmValue('arm1_rotate'); emitArmControls(); }
+        if (!bA1R1900 && arm1Rot1900Was) { document.getElementById('arm1_rotate').value = 1500; updateArmValue('arm1_rotate'); emitArmControls(); }
+        if (bA2R1100 && !arm2Rot1100Was) { document.getElementById('arm2_rotate').value = 1100; updateArmValue('arm2_rotate'); emitArmControls(); }
+        if (!bA2R1100 && arm2Rot1100Was) { document.getElementById('arm2_rotate').value = 1500; updateArmValue('arm2_rotate'); emitArmControls(); }
+        if (bA2R1900 && !arm2Rot1900Was) { document.getElementById('arm2_rotate').value = 1900; updateArmValue('arm2_rotate'); emitArmControls(); }
+        if (!bA2R1900 && arm2Rot1900Was) { document.getElementById('arm2_rotate').value = 1500; updateArmValue('arm2_rotate'); emitArmControls(); }
+        arm1Rot1100Was=bA1R1100; arm1Rot1900Was=bA1R1900;
+        arm2Rot1100Was=bA2R1100; arm2Rot1900Was=bA2R1900;
+
         let surge = 0, sway = 0, pitch = 0, roll = 0, yaw = 0;
         if (trigger) {
           pitch = applyInvert(raw_y * primaryGain, 'pitch');
@@ -1201,6 +1277,21 @@
     const el = document.getElementById(id);
     el.addEventListener('input', () => { updateArmValue(id); emitArmControls(); });
     el.addEventListener('change', () => { el.value = 1500; updateArmValue(id); emitArmControls(); });
+  });
+
+  const rotatePwmButtons = [
+    { id: 'arm1_rotate_1100', sliderId: 'arm1_rotate', pwm: 1100 },
+    { id: 'arm1_rotate_1900', sliderId: 'arm1_rotate', pwm: 1900 },
+    { id: 'arm2_rotate_1100', sliderId: 'arm2_rotate', pwm: 1100 },
+    { id: 'arm2_rotate_1900', sliderId: 'arm2_rotate', pwm: 1900 },
+  ];
+  rotatePwmButtons.forEach(({ id, sliderId, pwm }) => {
+    const btn = document.getElementById(id);
+    const slider = document.getElementById(sliderId);
+    const reset = () => { slider.value = 1500; updateArmValue(sliderId); emitArmControls(); };
+    btn.addEventListener('mousedown', () => { slider.value = pwm; updateArmValue(sliderId); emitArmControls(); });
+    btn.addEventListener('mouseup',    reset);
+    btn.addEventListener('mouseleave', reset);
   });
 
   const gripperButtons = {

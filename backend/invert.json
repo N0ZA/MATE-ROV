@@ -5,14 +5,14 @@
   "yaw": true,
   "pitch": false,
   "roll": true,
-  "depthHoldDir": false,
+  "depthHoldDir": true,
   "rollHoldDir": true,
-  "arm1Slew": false,
-  "arm1Shoulder": false,
+  "arm1Slew": true,
+  "arm1Shoulder": true,
   "arm1Rotate": false,
   "arm1Gripper": false,
-  "arm2Slew": false,
-  "arm2Shoulder": false,
+  "arm2Slew": true,
+  "arm2Shoulder": true,
   "arm2Rotate": false,
-  "arm2Gripper": false
+  "arm2Gripper": true
 }
