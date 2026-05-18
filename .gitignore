@@ -1,1 +1,20 @@
 /backend/node_modules
+
+# Datasets
+crab_dataset_labeled/
+crab_dataset_labeled.zip
+
+# Images
+augmented_images/
+*.jpeg
+*.jpg
+*.png
+
+# ML models
+*.pt
+*.onnx
+*.weights
+
+# Scripts
+datasetCreator.py
+stereo.py

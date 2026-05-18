@@ -5,50 +5,60 @@
   <title>Jalpari Mission Control v8</title>
   <script src="/socket.io/socket.io.js"></script>
   <style>
-    html, body { margin: 0; padding: 0; height: 100%; background: #150e2e; color: #f8fafc; font-family: 'Segoe UI', sans-serif; }
+    :root {
+      --bg3: #0d0822;
+      --bg2: #150e2e;
+      --bg1: #1e1240;
+      --p:   #3d2972;
+      --p1:  #5b3d8a;
+      --s:   #c4b5fd;
+      --s1:  #b0a0cc;
+    }
+
+    html, body { margin: 0; padding: 0; height: 100%; background: var(--bg2); color: #f8fafc; font-family: 'Segoe UI', sans-serif; }
     body { overflow: hidden; }
     * { box-sizing: border-box; }
     .main-layout { display: grid; grid-template-columns: 320px 1fr 340px; gap: 12px; height: 100vh; padding: 10px; min-width: 0; }
-    .card { background: #1e1240; padding: 10px; border-radius: 8px; border: 1px solid #3d2972; }
+    .card { background: var(--bg1); padding: 10px; border-radius: 8px; border: 1px solid var(--p); }
     .column { display: flex; flex-direction: column; gap: 10px; height: 100%; min-height: 0; }
     .left-column { overflow-y: auto; padding-right: 4px; min-height: 0; }
     .right-column { overflow-y: auto; padding-left: 4px; min-height: 0; }
 
     .dual-gimbals { display: flex; justify-content: space-between; gap: 10px; padding: 10px 0; }
     .gimbal-wrap { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 5px; }
-    .gimbal-label { font-size: 10px; color: #b0a0cc; text-transform: uppercase; font-weight: bold; }
-    .trackpad { width: 100%; aspect-ratio: 1 / 1; border-radius: 50%; border: 2px solid #3d2972; background: radial-gradient(circle at center, #1e1240, #150e2e); position: relative; overflow: hidden; box-shadow: inset 0 0 15px rgba(0,0,0,0.5); }
-    .trackpad::before, .trackpad::after { content: ""; position: absolute; background: #3d2972; }
+    .gimbal-label { font-size: 10px; color: var(--s1); text-transform: uppercase; font-weight: bold; }
+    .trackpad { width: 100%; aspect-ratio: 1 / 1; border-radius: 50%; border: 2px solid var(--p); background: radial-gradient(circle at center, var(--bg1), var(--bg2)); position: relative; overflow: hidden; box-shadow: inset 0 0 15px rgba(0,0,0,0.5); }
+    .trackpad::before, .trackpad::after { content: ""; position: absolute; background: var(--p); }
     .trackpad::before { left: 50%; top: 0; width: 2px; height: 100%; transform: translateX(-50%); }
     .trackpad::after { top: 50%; left: 0; width: 100%; height: 2px; transform: translateY(-50%); }
-    .joystick-dot { position: absolute; left: 50%; top: 50%; width: 18px; height: 18px; border-radius: 50%; background: #c4b5fd; box-shadow: 0 0 10px #c4b5fd; transform: translate(-50%, -50%); pointer-events: none; transition: transform 0.05s linear; z-index: 2; }
+    .joystick-dot { position: absolute; left: 50%; top: 50%; width: 18px; height: 18px; border-radius: 50%; background: var(--s); box-shadow: 0 0 10px var(--s); transform: translate(-50%, -50%); pointer-events: none; transition: transform 0.05s linear; z-index: 2; }
     .joystick-dot.right-stick { background: #facc15; box-shadow: 0 0 10px #facc15; }
 
-    .heave-yaw-display { width: 100%; aspect-ratio: 1 / 1; border-radius: 12px; border: 2px solid #3d2972; background: #0d0820; position: relative; overflow: hidden; display: flex; align-items: center; justify-content: center; perspective: 600px; }
-    .heave-yaw-display::before { content: ""; position: absolute; width: 100%; height: 2px; background: #1e1240; top: 50%; left: 0; transform: translateY(-50%); }
-    .heave-yaw-display::after { content: "SURFACE"; position: absolute; top: 4px; font-size: 8px; color: #5b3d8a; letter-spacing: 2px; }
+    .heave-yaw-display { width: 100%; aspect-ratio: 1 / 1; border-radius: 12px; border: 2px solid var(--p); background: var(--bg3); position: relative; overflow: hidden; display: flex; align-items: center; justify-content: center; perspective: 600px; }
+    .heave-yaw-display::before { content: ""; position: absolute; width: 100%; height: 2px; background: var(--bg1); top: 50%; left: 0; transform: translateY(-50%); }
+    .heave-yaw-display::after { content: "SURFACE"; position: absolute; top: 4px; font-size: 8px; color: var(--p1); letter-spacing: 2px; }
 
     .tiny-rov { position: relative; width: 40px; height: 60px; transition: transform 0.05s linear; z-index: 5; transform-style: preserve-3d; }
     .tiny-rov-body { position: absolute; top: 10%; left: 10%; width: 80%; height: 80%; background: linear-gradient(to bottom, #facc15, #ca8a04); border-radius: 6px; z-index: 2; box-shadow: 0 5px 15px rgba(0,0,0,0.6); transform-style: preserve-3d; }
     .tiny-rov-nose { position: absolute; top: -5px; left: 50%; transform: translateX(-50%) translateZ(10px); width: 16px; height: 8px; background: #f97316; border-radius: 4px 4px 0 0; z-index: 3; box-shadow: 0 0 8px #f97316; }
-    .tiny-rov-dome { position: absolute; top: 30%; left: 50%; transform: translate(-50%, -50%) translateZ(15px); width: 14px; height: 14px; background: #c4b5fd; border-radius: 50%; z-index: 4; border: 2px solid #150e2e; box-shadow: inset -2px -2px 4px rgba(0,0,0,0.5); }
-    .tiny-rov-prop { position: absolute; width: 10px; height: 16px; background: #3d2972; border-radius: 4px; z-index: 1; border: 1px solid #5b3d8a; }
+    .tiny-rov-dome { position: absolute; top: 30%; left: 50%; transform: translate(-50%, -50%) translateZ(15px); width: 14px; height: 14px; background: var(--s); border-radius: 50%; z-index: 4; border: 2px solid var(--bg2); box-shadow: inset -2px -2px 4px rgba(0,0,0,0.5); }
+    .tiny-rov-prop { position: absolute; width: 10px; height: 16px; background: var(--p); border-radius: 4px; z-index: 1; border: 1px solid var(--p1); }
     .tiny-rov-prop.tl { top: 0px; left: -6px; }
     .tiny-rov-prop.tr { top: 0px; right: -6px; }
     .tiny-rov-prop.bl { bottom: 0px; left: -6px; }
     .tiny-rov-prop.br { bottom: 0px; right: -6px; }
 
     .rov-map-container { display: flex; justify-content: center; padding: 15px 0; }
-    .rov-hull { width: 120px; height: 180px; border: 2px solid #5b3d8a; border-radius: 20px; position: relative; background: rgba(15, 23, 42, 0.5); }
+    .rov-hull { width: 120px; height: 180px; border: 2px solid var(--p1); border-radius: 20px; position: relative; background: rgba(15, 23, 42, 0.5); }
     .rov-nose { position: absolute; top: -10px; left: 50%; transform: translateX(-50%); width: 40px; height: 10px; background: #f97316; border-radius: 5px 5px 0 0; z-index: 3; box-shadow: 0 0 10px #f97316; }
-    .thruster-node { position: absolute; width: 24px; height: 36px; background: #3d2972; border-radius: 6px; border: 2px solid #1e1240; transition: background-color 0.1s linear, box-shadow 0.1s linear; display: flex; align-items: center; justify-content: center; font-size: 9px; font-weight: bold; color: rgba(255,255,255,0.4); }
+    .thruster-node { position: absolute; width: 24px; height: 36px; background: var(--p); border-radius: 6px; border: 2px solid var(--bg1); transition: background-color 0.1s linear, box-shadow 0.1s linear; display: flex; align-items: center; justify-content: center; font-size: 9px; font-weight: bold; color: rgba(255,255,255,0.4); }
     .node-fl { top: -10px; left: -15px; transform: rotate(-45deg); }
     .node-fr { top: -10px; right: -15px; transform: rotate(45deg); }
     .node-rl { bottom: -10px; left: -15px; transform: rotate(45deg); }
     .node-rr { bottom: -10px; right: -15px; transform: rotate(-45deg); }
     .node-vl { top: 50%; left: -18px; transform: translateY(-50%); border-radius: 50%; width: 30px; height: 30px; }
     .node-vr { top: 50%; right: -18px; transform: translateY(-50%); border-radius: 50%; width: 30px; height: 30px; }
-    .pwm-label { position: absolute; font-size: 8px; font-family: monospace; font-weight: bold; color: #b0a0cc; white-space: nowrap; }
+    .pwm-label { position: absolute; font-size: 8px; font-family: monospace; font-weight: bold; color: var(--s1); white-space: nowrap; }
     #pwmFL { top: 8px; left: 6px; }
     #pwmFR { top: 8px; right: 6px; }
     #pwmRL { bottom: 8px; left: 6px; }
@@ -59,94 +69,98 @@
     .box-grid { display: grid; gap: 10px; }
     .box-grid-2x2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .box-grid-3x2 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-    .value-box { background: #0d0822; border: 1px solid #23314c; border-radius: 10px; padding: 10px; min-height: 60px; text-align: center; }
-    .value-box .value { font-size: 18px; font-weight: 700; color: #c4b5fd; font-family: Consolas, monospace; margin-top: 4px;}
+    .value-box { background: var(--bg3); border: 1px solid #23314c; border-radius: 10px; padding: 10px; min-height: 60px; text-align: center; }
+    .value-box .value { font-size: 18px; font-weight: 700; color: var(--s); font-family: Consolas, monospace; margin-top: 4px;}
     .camera-grid { display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: repeat(2, minmax(120px, 1fr)); gap: 8px; height: 100%; min-height: 0; }
-    .video-box { background: #000; border: 2px solid #5b3d8a; border-radius: 4px; display: flex; align-items: center; justify-content: center; position: relative; color: #5b3d8a; font-weight: bold; font-size: 12px; min-height: 120px; }
-    .cam-tag { position: absolute; top: 8px; left: 8px; background: rgba(0,0,0,0.7); font-size: 10px; padding: 3px 8px; color: #c4b5fd; border-radius: 2px; }
+    .video-box { background: #000; border: 2px solid var(--p1); border-radius: 4px; display: flex; align-items: center; justify-content: center; position: relative; color: var(--p1); font-weight: bold; font-size: 12px; min-height: 120px; }
+    .cam-tag { position: absolute; top: 8px; left: 8px; background: rgba(0,0,0,0.7); font-size: 10px; padding: 3px 8px; color: var(--s); border-radius: 2px; }
     .camera-column { display: flex; flex-direction: column; min-height: 0; }
-    .compass { width: 100px; height: 100px; border: 3px solid #c4b5fd; border-radius: 50%; position: relative; margin: 8px auto; background: #000; overflow: hidden; }
+    .compass { width: 100px; height: 100px; border: 3px solid var(--s); border-radius: 50%; position: relative; margin: 8px auto; background: #000; overflow: hidden; }
     .yaw-needle { width: 4px; height: 38px; background: #ef4444; position: absolute; left: 50%; bottom: 50%; transform-origin: bottom center; transition: transform 0.05s linear; }
     .horizon-wrap { width: 100%; height: 100%; position: absolute; top: 0; left: 0; overflow: hidden; border-radius: 50%; }
     .horizon-line { width: 90%; height: 2px; background: #22c55e; position: absolute; top: 50%; left: 50%; transform-origin: center center; transition: transform 0.05s linear; }
-    h3 { font-size: 11px; margin: 0 0 8px 0; color: #c4b5fd; text-transform: uppercase; letter-spacing: 1px; border-bottom: 1px solid #3d2972; padding-bottom: 4px; }
-    .label { font-size: 10px; color: #b0a0cc; text-transform: uppercase; }
-    .val-num { font-family: monospace; font-size: 18px; color: #c4b5fd; font-weight: bold; }
+    h3 { font-size: 11px; margin: 0 0 8px 0; color: var(--s); text-transform: uppercase; letter-spacing: 1px; border-bottom: 1px solid var(--p); padding-bottom: 4px; }
+    .label { font-size: 10px; color: var(--s1); text-transform: uppercase; }
+    .val-num { font-family: monospace; font-size: 18px; color: var(--s); font-weight: bold; }
     #conn { font-weight: bold; margin-left: 6px; }
     .dir-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 5px; margin-top: 5px; }
-    .dir-btn { padding: 4px; font-size: 10px; cursor: pointer; border: 1px solid #3d2972; border-radius: 3px; background: #3d2972; color: white; }
-    .sel-btn { padding: 4px; font-size: 10px; cursor: pointer; border: 1px solid #3d2972; border-radius: 3px; background: #3d2972; color: white; font-weight: bold; }
-    .arm-state-btn { flex: 1; padding: 8px; font-size: 12px; font-weight: bold; cursor: pointer; border-radius: 4px; border: 2px solid #5b3d8a; background: #3d2972; color: #b0a0cc; }
+    .dir-btn { padding: 4px; font-size: 10px; cursor: pointer; border: 1px solid var(--p); border-radius: 3px; background: var(--p); color: white; }
+    .sel-btn { padding: 4px; font-size: 10px; cursor: pointer; border: 1px solid var(--p); border-radius: 3px; background: var(--p); color: white; font-weight: bold; }
+    .arm-state-btn { flex: 1; padding: 8px; font-size: 12px; font-weight: bold; cursor: pointer; border-radius: 4px; border: 2px solid var(--p1); background: var(--p); color: var(--s1); }
     #btn-arm.active    { background: #16a34a; border-color: #22c55e; color: #fff; box-shadow: 0 0 8px #22c55e44; }
     #btn-disarm.active { background: #b91c1c; border-color: #ef4444; color: #fff; box-shadow: 0 0 8px #ef444444; }
 
     .arm-container { margin-top: 3px; }
     .arm-section { margin-bottom: 6px; }
-    .arm-section-title { font-size: 10px; color: #c4b5fd; font-weight: bold; margin-bottom: 3px; display: block; }
+    .arm-section-title { font-size: 10px; color: var(--s); font-weight: bold; margin-bottom: 3px; display: block; }
     .arm-slider-row { display: flex; align-items: center; gap: 4px; margin-bottom: 2px; }
-    .arm-slider-label { font-size: 9px; color: #b0a0cc; width: 60px; text-transform: uppercase; flex-shrink: 0; }
-    .arm-slider { flex: 1; min-width: 0; height: 15px; -webkit-appearance: none; appearance: none; background: #0d0822; border-radius: 3px; border: 1px solid #3d2972; outline: none; }
+    .arm-slider-label { font-size: 9px; color: var(--s1); width: 60px; text-transform: uppercase; flex-shrink: 0; }
+    .arm-slider { flex: 1; min-width: 0; height: 15px; -webkit-appearance: none; appearance: none; background: var(--bg3); border-radius: 3px; border: 1px solid var(--p); outline: none; }
     .arm-slider::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 13px; height: 13px; border-radius: 50%; background: #facc15; cursor: pointer; border: 2px solid #f97316; }
     .arm-slider::-moz-range-thumb { width: 13px; height: 13px; border-radius: 50%; background: #facc15; cursor: pointer; border: 2px solid #f97316; }
     .arm-slider-value { font-size: 9px; font-family: Consolas, monospace; color: #facc15; width: 38px; text-align: right; flex-shrink: 0; }
     .gripper-controls { display: flex; gap: 5px; }
-    .gripper-controls button { background: #3d2972; border: 1px solid #5b3d8a; color: white; padding: 5px 8px; border-radius: 4px; cursor: pointer; font-size: 10px; font-weight: bold; }
-    .gripper-controls button.active { background: #c4b5fd; border-color: #c4b5fd; box-shadow: 0 0 8px #c4b5fd; }
-    .rotate-pwm-btn { background: #3d2972; border: 1px solid #5b3d8a; color: #facc15; padding: 3px 5px; border-radius: 4px; cursor: pointer; font-size: 9px; font-weight: bold; flex-shrink: 0; }
+    .gripper-controls button { background: var(--p); border: 1px solid var(--p1); color: white; padding: 5px 8px; border-radius: 4px; cursor: pointer; font-size: 10px; font-weight: bold; }
+    .gripper-controls button.active { background: var(--s); border-color: var(--s); box-shadow: 0 0 8px var(--s); }
+    .rotate-pwm-btn { background: var(--p); border: 1px solid var(--p1); color: #facc15; padding: 3px 5px; border-radius: 4px; cursor: pointer; font-size: 9px; font-weight: bold; flex-shrink: 0; }
     .rotate-pwm-btn:active { background: #f97316; border-color: #f97316; }
 
     /* ====== SETTINGS BUTTON ====== */
-    .settings-btn { position: fixed; bottom: 16px; right: 16px; z-index: 100; background: #1e1240; border: 1px solid #3d2972; color: #b0a0cc; padding: 7px 14px; border-radius: 6px; cursor: pointer; font-size: 11px; letter-spacing: 1px; }
-    .settings-btn:hover { border-color: #c4b5fd; color: #c4b5fd; }
+    .settings-btn { position: fixed; bottom: 16px; right: 16px; z-index: 100; background: var(--bg1); border: 1px solid var(--p); color: var(--s1); padding: 7px 14px; border-radius: 6px; cursor: pointer; font-size: 11px; letter-spacing: 1px; }
+    .settings-btn:hover { border-color: var(--s); color: var(--s); }
 
     /* ====== SETTINGS MODAL ====== */
     .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 200; align-items: flex-start; justify-content: center; padding: 20px; overflow-y: auto; }
     .modal-overlay.open { display: flex; }
-    .modal { background: #1e1240; border: 1px solid #3d2972; border-radius: 12px; padding: 0; width: 620px; max-width: 100%; overflow: hidden; }
+    .modal { background: var(--bg1); border: 1px solid var(--p); border-radius: 12px; padding: 0; width: 620px; max-width: 100%; overflow: hidden; }
 
     /* Settings tabs */
-    .modal-tabs { display: flex; border-bottom: 1px solid #3d2972; }
-    .modal-tab { flex: 1; padding: 12px 8px; font-size: 11px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; cursor: pointer; background: transparent; border: none; color: #7c5cb5; border-bottom: 2px solid transparent; margin-bottom: -1px; transition: color 0.15s, border-color 0.15s; }
-    .modal-tab:hover { color: #b0a0cc; }
-    .modal-tab.active { color: #c4b5fd; border-bottom-color: #c4b5fd; }
+    .modal-tabs { display: flex; border-bottom: 1px solid var(--p); }
+    .modal-tab { flex: 1; padding: 12px 8px; font-size: 11px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; cursor: pointer; background: transparent; border: none; color: var(--p1); border-bottom: 2px solid transparent; margin-bottom: -1px; transition: color 0.15s, border-color 0.15s; }
+    .modal-tab:hover { color: var(--s1); }
+    .modal-tab.active { color: var(--s); border-bottom-color: var(--s); }
 
     .modal-body { padding: 20px; max-height: 70vh; overflow-y: auto; }
-    .modal-title { font-size: 12px; color: #c4b5fd; text-transform: uppercase; letter-spacing: 2px; margin: 0 0 4px 0; }
-    .modal-hint { font-size: 10px; color: #5b3d8a; margin: 0 0 14px 0; }
+    .modal-title { font-size: 12px; color: var(--s); text-transform: uppercase; letter-spacing: 2px; margin: 0 0 4px 0; }
+    .modal-hint { font-size: 10px; color: var(--p1); margin: 0 0 14px 0; }
 
     /* Tab panels */
     .tab-panel { display: none; }
     .tab-panel.active { display: block; }
 
     /* Axis inversion rows */
-    .invert-section-title { font-size: 10px; color: #7c5cb5; text-transform: uppercase; letter-spacing: 1px; margin: 14px 0 6px 0; padding-bottom: 4px; border-bottom: 1px solid #3d2a6e; }
-    .invert-row { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid #150e2e; }
-    .invert-label { flex: 1; font-size: 11px; color: #b0a0cc; }
-    .invert-desc { font-size: 10px; color: #5b3d8a; width: 180px; }
-    .toggle-btn { width: 80px; padding: 5px 10px; font-size: 10px; font-weight: bold; text-transform: uppercase; border-radius: 4px; border: 1px solid #5b3d8a; background: #3d2972; color: #b0a0cc; cursor: pointer; transition: all 0.15s; text-align: center; letter-spacing: 0.5px; }
+    .invert-section-title { font-size: 10px; color: var(--p1); text-transform: uppercase; letter-spacing: 1px; margin: 14px 0 6px 0; padding-bottom: 4px; border-bottom: 1px solid var(--p); }
+    .invert-row { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--bg2); }
+    .invert-label { flex: 1; font-size: 11px; color: var(--s1); }
+    .invert-desc { font-size: 10px; color: var(--p1); width: 180px; }
+    .toggle-btn { width: 80px; padding: 5px 10px; font-size: 10px; font-weight: bold; text-transform: uppercase; border-radius: 4px; border: 1px solid var(--p1); background: var(--p); color: var(--s1); cursor: pointer; transition: all 0.15s; text-align: center; letter-spacing: 0.5px; }
     .toggle-btn.reversed { background: #ef4444; border-color: #ef4444; color: #fff; box-shadow: 0 0 8px rgba(239,68,68,0.4); }
     .toggle-btn.normal { background: #22c55e; border-color: #22c55e; color: #000; box-shadow: 0 0 8px rgba(34,197,94,0.3); }
 
     /* Bindings */
-    .binding-section { font-size: 10px; color: #7c5cb5; text-transform: uppercase; letter-spacing: 1px; margin: 12px 0 4px 0; }
-    .binding-row { display: flex; align-items: center; gap: 10px; padding: 7px 0; border-bottom: 1px solid #150e2e; }
-    .binding-label { flex: 1; font-size: 11px; color: #b0a0cc; }
-    .binding-value { font-family: Consolas, monospace; font-size: 11px; color: #facc15; width: 110px; text-align: center; background: #150e2e; padding: 3px 6px; border-radius: 4px; border: 1px solid #3d2a6e; }
+    .binding-section { font-size: 10px; color: var(--p1); text-transform: uppercase; letter-spacing: 1px; margin: 12px 0 4px 0; }
+    .binding-row { display: flex; align-items: center; gap: 10px; padding: 7px 0; border-bottom: 1px solid var(--bg2); }
+    .binding-label { flex: 1; font-size: 11px; color: var(--s1); }
+    .binding-value { font-family: Consolas, monospace; font-size: 11px; color: #facc15; width: 110px; text-align: center; background: var(--bg2); padding: 3px 6px; border-radius: 4px; border: 1px solid var(--p); }
     .binding-value.listening { color: #f97316; border-color: #f97316; animation: blink 0.7s infinite; }
     @keyframes blink { 0%,100% { opacity:1; } 50% { opacity:0.35; } }
-    .remap-btn { background: #3d2972; border: 1px solid #5b3d8a; color: #f8fafc; padding: 3px 10px; border-radius: 4px; cursor: pointer; font-size: 10px; white-space: nowrap; }
-    .remap-btn:hover { border-color: #c4b5fd; }
+    .remap-btn { background: var(--p); border: 1px solid var(--p1); color: #f8fafc; padding: 3px 10px; border-radius: 4px; cursor: pointer; font-size: 10px; white-space: nowrap; }
+    .remap-btn:hover { border-color: var(--s); }
     .remap-btn.active { background: #f97316; border-color: #f97316; }
 
-    .modal-footer { display: flex; gap: 10px; padding: 14px 20px; border-top: 1px solid #3d2972; justify-content: flex-end; background: #1a1040; }
-    .modal-footer button { padding: 6px 16px; border-radius: 5px; border: 1px solid #3d2972; background: #150e2e; color: #f8fafc; cursor: pointer; font-size: 11px; }
-    .modal-close-btn { border-color: #c4b5fd !important; color: #c4b5fd !important; }
+    .modal-footer { display: flex; gap: 10px; padding: 14px 20px; border-top: 1px solid var(--p); justify-content: flex-end; background: var(--bg1); }
+    .modal-footer button { padding: 6px 16px; border-radius: 5px; border: 1px solid var(--p); background: var(--bg2); color: #f8fafc; cursor: pointer; font-size: 11px; }
+    .modal-close-btn { border-color: var(--s) !important; color: var(--s) !important; }
     .modal-reset-btn { color: #ef4444 !important; border-color: #ef4444 !important; }
     .modal-save-btn { border-color: #22c55e !important; color: #22c55e !important; }
 
     /* Info note */
-    .info-note { background: #150e2e; border: 1px solid #3d2a6e; border-radius: 6px; padding: 8px 12px; font-size: 10px; color: #5b3d8a; margin-bottom: 14px; line-height: 1.5; }
-    .info-note span { color: #c4b5fd; }
+    .info-note { background: var(--bg2); border: 1px solid var(--p); border-radius: 6px; padding: 8px 12px; font-size: 10px; color: var(--p1); margin-bottom: 14px; line-height: 1.5; }
+    .info-note span { color: var(--s); }
+
+    /* Theme color pickers */
+    .theme-picker-row { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--bg2); }
+    .theme-picker-row input[type="color"] { width: 44px; height: 32px; border: 1px solid var(--p1); border-radius: 4px; background: none; cursor: pointer; padding: 2px; }
   </style>
 </head>
 <body>
@@ -154,23 +168,23 @@
     <div class="column left-column">
       <div class="card">
         <h3>SYSTEM MODIFIERS</h3>
-        <div id="gainModeTag" style="text-align:center;padding:4px 8px;margin-bottom:8px;border-radius:4px;font-size:10px;font-weight:bold;letter-spacing:1px;border:1px solid #c4b5fd;color:#c4b5fd;background:rgba(196,181,253,0.1);">EDITING: PRIMARY + SECONDARY</div>
+        <div id="gainModeTag" style="text-align:center;padding:4px 8px;margin-bottom:8px;border-radius:4px;font-size:10px;font-weight:bold;letter-spacing:1px;border:1px solid #f59e0b;color:#f59e0b;background:rgba(245,158,11,0.1);">FAST MODE</div>
         <div class="box-grid box-grid-2x2">
           <div class="value-box" id="gainBoxPrimary" style="border-color:#c4b5fd;">
-            <div class="label">Primary</div>
-            <div class="value" id="valGain" style="color:#c4b5fd;">50%</div>
+            <div class="label">Surge</div>
+            <div class="value" id="valGain" style="color:#c4b5fd;">65%</div>
           </div>
           <div class="value-box" id="gainBoxSecondary" style="border-color:#a78bfa;">
-            <div class="label">Secondary</div>
+            <div class="label">Vertical</div>
             <div class="value" id="valVGain" style="color:#a78bfa;">50%</div>
           </div>
-          <div class="value-box" id="gainBoxSway" style="border-color:#3d2972;">
+          <div class="value-box" id="gainBoxSway" style="border-color:#c4b5fd;">
             <div class="label">Sway</div>
-            <div class="value" id="valSwayGain" style="color:#b0a0cc;">50%</div>
+            <div class="value" id="valSwayGain" style="color:#c4b5fd;">65%</div>
           </div>
-          <div class="value-box" id="gainBoxYaw" style="border-color:#3d2972;">
+          <div class="value-box" id="gainBoxYaw" style="border-color:#c4b5fd;">
             <div class="label">Yaw</div>
-            <div class="value" id="valYawGain" style="color:#b0a0cc;">50%</div>
+            <div class="value" id="valYawGain" style="color:#c4b5fd;">65%</div>
           </div>
           <div class="value-box" style="border-color:#22c55e;grid-column:span 2;">
             <div class="label">Roll</div>
@@ -198,21 +212,6 @@
             <div class="gimbal-label">Sway / Surge</div>
             <div class="trackpad" id="trackpad">
               <div class="joystick-dot" id="leftStick"></div>
-            </div>
-          </div>
-          <div class="gimbal-wrap">
-            <div class="gimbal-label">Yaw (Rotate) / Heave (Up)</div>
-            <div class="heave-yaw-display">
-              <div class="tiny-rov" id="rightStickROV">
-                <div class="tiny-rov-body">
-                   <div class="tiny-rov-dome"></div>
-                </div>
-                <div class="tiny-rov-nose"></div>
-                <div class="tiny-rov-prop tl"></div>
-                <div class="tiny-rov-prop tr"></div>
-                <div class="tiny-rov-prop bl"></div>
-                <div class="tiny-rov-prop br"></div>
-              </div>
             </div>
           </div>
         </div>
@@ -312,8 +311,8 @@
         <div class="card">
           <h3>THRUSTER ARM</h3>
           <div style="display:flex; gap:8px; margin-top:5px;">
-            <button class="arm-state-btn active" id="btn-arm"    onclick="setArmed(true)">ARM</button>
-            <button class="arm-state-btn" id="btn-disarm" onclick="setArmed(false)">DISARM</button>
+            <button class="arm-state-btn" id="btn-arm"    onclick="setArmed(true)">ARM</button>
+            <button class="arm-state-btn active" id="btn-disarm" onclick="setArmed(false)">DISARM</button>
           </div>
           <div style="font-size:9px; color:#7c5cb5; margin-top:5px;" id="arm-status-label">ARMED — thrusters active</div>
         </div>
@@ -349,6 +348,8 @@
         <h3>SENSORS</h3>
         <div class="label">Depth</div>
         <div class="val-num" id="depth">0.00 m</div>
+        <div class="label" id="depthTargetLabel" style="display:none; margin-top:4px;">Target</div>
+        <div class="val-num" id="depthTargetDisplay" style="display:none; color:#f59e0b;">0.00 m</div>
         <div class="label" style="margin-top:10px;">Network</div>
         <div style="color:#22c55e; font-weight:bold;"><span id="ping">0</span> ms</div>
       </div>
@@ -367,6 +368,7 @@
         <button class="modal-tab" onclick="switchTab('tab-bindings')">🔗 Bindings</button>
         <button class="modal-tab" onclick="switchTab('tab-calib')">🔧 Calibration</button>
         <button class="modal-tab" onclick="switchTab('tab-dof')">🎯 DOF Mode</button>
+        <button class="modal-tab" onclick="switchTab('tab-theme')">🎨 Theme</button>
       </div>
 
       <div class="modal-body">
@@ -501,6 +503,26 @@
           </div>
         </div>
 
+        <div class="tab-panel" id="tab-theme">
+          <p class="modal-title">Theme Colors</p>
+          <p class="modal-hint">Changes apply live. Colors are saved when you close settings.</p>
+          <div class="theme-picker-row">
+            <div class="invert-label">Primary Color</div>
+            <div class="invert-desc">Borders, buttons, backgrounds</div>
+            <input type="color" id="colorPrimary" value="#3d2972"
+                   oninput="applyTheme(this.value, document.getElementById('colorSecondary').value)">
+          </div>
+          <div class="theme-picker-row">
+            <div class="invert-label">Accent Color</div>
+            <div class="invert-desc">Headings, values, highlights</div>
+            <input type="color" id="colorSecondary" value="#c4b5fd"
+                   oninput="applyTheme(document.getElementById('colorPrimary').value, this.value)">
+          </div>
+          <div style="margin-top:14px;">
+            <button class="remap-btn" onclick="resetTheme()">Reset to Default</button>
+          </div>
+        </div>
+
       </div><!-- /modal-body -->
 
       <div class="modal-footer">
@@ -553,10 +575,16 @@
   });
 
   socket.on('arm-update', (data) => {
+    const invertKeyMap = {
+      'arm1_slew': 'arm1Slew', 'arm1_shoulder': 'arm1Shoulder', 'arm1_rotate': 'arm1Rotate',
+      'arm2_slew': 'arm2Slew', 'arm2_shoulder': 'arm2Shoulder', 'arm2_rotate': 'arm2Rotate',
+    };
     const ids = ['arm1_slew','arm1_shoulder','arm1_rotate','arm2_slew','arm2_shoulder','arm2_rotate'];
     ids.forEach((id) => {
       if (data[id] !== undefined) {
-        const val = Number(data[id]);
+        const raw = Number(data[id]);
+        const invKey = invertKeyMap[id];
+        const val = (invKey && axisInvert[invKey]) ? (3000 - raw) : raw;
         const slider = document.getElementById(id);
         const label  = document.getElementById(id + '_val');
         if (!slider || !label) return;
@@ -627,7 +655,6 @@
   });
 
   const leftStick = document.getElementById('leftStick');
-  const rightStickRov = document.getElementById('rightStickROV');
 
   const visNodes = {
     FL: document.getElementById('visFL'), FR: document.getElementById('visFR'),
@@ -636,14 +663,19 @@
   };
 
   let nx = 0, ny = 0, yawNorm = 0, verticalNorm = 0;
-  let primaryGain = 0.50, secondaryGain = 0.50, currentPitch = 0, currentRoll = 0;
-  let swayGain = 0.50, yawGain = 0.50, rollGain = 0.50;
-  let gainMode = 'primary-secondary'; // 'primary-secondary' | 'sway-yaw'
+  const modeGains = {
+    fast: { surge: 0.65, sway: 0.65, yaw: 0.65 },
+    slow: { surge: 0.30, sway: 0.30, yaw: 0.30 }
+  };
+  let speedMode = 'fast'; // 'fast' | 'slow'
+  let surgeGain = 0.65, verticalGain = 0.50, currentPitch = 0, currentRoll = 0;
+  let swayGain = 0.65, yawGain = 0.65, rollGain = 0.50;
   let prevHatX = 0, prevHatY = 0;
   let gainUpWas = false, gainDownWas = false, vgUpWas = false, vgDownWas = false;
   let modeSurgeWas=false, modeSwayWas=false, modeHeaveWas=false,
       modeYawWas=false, modePitchWas=false, modeRollWas=false;
   let depthHoldWas=false, rollHoldWas=false, stabilizeWas=false;
+  let depthUpWas=false, depthDownWas=false;
   let arm1Rot1100Was=false, arm1Rot1900Was=false,
       arm2Rot1100Was=false, arm2Rot1900Was=false;
   let armBtnWas=false, disarmBtnWas=false;
@@ -710,7 +742,7 @@
   }
 
   /* ============ ARM / DISARM ============ */
-  let isArmed = true;
+  let isArmed = false;
 
   function setArmed(state) {
     socket.emit('set-armed', state);
@@ -728,7 +760,7 @@
   const ROLL_HOLD_KP  = 0.02; // deg^-1: 50° error → full roll correction
 
   let depthHoldActive = false, depthHoldTarget = 0;
-  let rollHoldActive  = false, rollHoldTarget  = 0;
+  let rollHoldActive  = true,  rollHoldTarget  = 0;
   let stabilizeActive = false;
 
   let latestDepth   = 0;
@@ -770,6 +802,10 @@
     }
   }
 
+  // Apply startup defaults: disarmed, roll hold on, fast mode
+  setArmed(false);
+  renderHoldButtons();
+
   /* ============ BINDINGS ============ */
   // FIX: swapped axisX (was 0→sway) and axisYaw (was 5→yaw) defaults to match physical controller layout
   const DEFAULT_BINDINGS = {
@@ -780,6 +816,7 @@
     btnModeSurge: -1, btnModeSway: -1, btnModeHeave: -1,
     btnModeYaw: -1, btnModePitch: -1, btnModeRoll: -1,
     btnDepthHold: -1, btnRollHold: -1, btnStabilize: -1,
+    btnDepthUp: -1, btnDepthDown: -1,
     btnArm1Rotate1100: -1, btnArm1Rotate1900: -1,
     btnArm2Rotate1100: -1, btnArm2Rotate1900: -1,
     btnArm: -1, btnDisarm: -1,
@@ -788,6 +825,65 @@
   let bindings = JSON.parse(localStorage.getItem('gpBindings') || 'null') || {...DEFAULT_BINDINGS};
 
   function saveBindings() { localStorage.setItem('gpBindings', JSON.stringify(bindings)); }
+
+  /* ============ THEME ============ */
+  function hexToHsl(hex) {
+    let r = parseInt(hex.slice(1,3),16)/255, g = parseInt(hex.slice(3,5),16)/255, b = parseInt(hex.slice(5,7),16)/255;
+    const max = Math.max(r,g,b), min = Math.min(r,g,b);
+    let h, s, l = (max+min)/2;
+    if (max === min) { h = s = 0; } else {
+      const d = max-min;
+      s = l > 0.5 ? d/(2-max-min) : d/(max+min);
+      switch(max) {
+        case r: h = ((g-b)/d + (g<b?6:0))/6; break;
+        case g: h = ((b-r)/d + 2)/6; break;
+        case b: h = ((r-g)/d + 4)/6; break;
+      }
+    }
+    return [Math.round(h*360), Math.round(s*100), Math.round(l*100)];
+  }
+
+  function hslToHex(h, s, l) {
+    s /= 100; l /= 100;
+    const k = n => (n + h/30) % 12, a = s * Math.min(l, 1-l);
+    const f = n => Math.round(255*(l - a*Math.max(-1, Math.min(k(n)-3, Math.min(9-k(n), 1)))));
+    return '#' + [f(0),f(8),f(4)].map(v => v.toString(16).padStart(2,'0')).join('');
+  }
+
+  function clampHsl(h, s, l) {
+    return [((h%360)+360)%360, Math.max(0,Math.min(100,s)), Math.max(2,Math.min(98,l))];
+  }
+
+  function applyTheme(primary, secondary) {
+    const [pH, pS, pL] = hexToHsl(primary);
+    const [sH, sS, sL] = hexToHsl(secondary);
+    const set = (n, v) => document.documentElement.style.setProperty(n, v);
+    set('--p',   primary);
+    set('--p1',  hslToHex(...clampHsl(pH, pS - 15, pL + 15)));
+    set('--bg1', hslToHex(...clampHsl(pH, pS,      pL - 13)));
+    set('--bg2', hslToHex(...clampHsl(pH, pS -  7, pL - 18)));
+    set('--bg3', hslToHex(...clampHsl(pH, pS + 15, pL - 22)));
+    set('--s',   secondary);
+    set('--s1',  hslToHex(...clampHsl(sH, sS - 60, sL - 14)));
+  }
+
+  function resetTheme() {
+    const p = '#3d2972', s = '#c4b5fd';
+    document.getElementById('colorPrimary').value   = p;
+    document.getElementById('colorSecondary').value = s;
+    applyTheme(p, s);
+    localStorage.removeItem('themeColors');
+  }
+
+  // Restore saved theme on load
+  (function() {
+    const saved = JSON.parse(localStorage.getItem('themeColors') || 'null');
+    if (saved) {
+      document.getElementById('colorPrimary').value   = saved.primary;
+      document.getElementById('colorSecondary').value = saved.secondary;
+      applyTheme(saved.primary, saved.secondary);
+    }
+  })();
 
   function saveBindingsToDisk() {
     return fetch('/api/bindings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(bindings) });
@@ -835,9 +931,11 @@
     { key: 'btnModePitch', label: 'Mode: Pitch', type: 'button' },
     { key: 'btnModeRoll',  label: 'Mode: Roll',  type: 'button' },
     { section: 'Hold Modes' },
-    { key: 'btnDepthHold', label: 'Depth Hold', type: 'button' },
-    { key: 'btnRollHold',  label: 'Roll Hold',  type: 'button' },
-    { key: 'btnStabilize', label: 'Stabilize',  type: 'button' },
+    { key: 'btnDepthHold', label: 'Depth Hold',      type: 'button' },
+    { key: 'btnRollHold',  label: 'Roll Hold',       type: 'button' },
+    { key: 'btnStabilize', label: 'Stabilize',       type: 'button' },
+    { key: 'btnDepthUp',   label: 'Depth Target +',  type: 'button' },
+    { key: 'btnDepthDown', label: 'Depth Target −',  type: 'button' },
     { section: 'Arm Rotate' },
     { key: 'btnArm1Rotate1100', label: 'Right Arm Rotate 1100', type: 'button' },
     { key: 'btnArm1Rotate1900', label: 'Right Arm Rotate 1900', type: 'button' },
@@ -894,6 +992,10 @@
   function closeSettings() {
     remapTarget = null;
     document.getElementById('settingsModal').classList.remove('open');
+    localStorage.setItem('themeColors', JSON.stringify({
+      primary:   document.getElementById('colorPrimary').value,
+      secondary: document.getElementById('colorSecondary').value
+    }));
   }
 
   function resetCurrentTab() {
@@ -930,8 +1032,8 @@
 
   function updateUIElements() {
     const any = activeModes.size > 0;
-    const dispX     = (stabilizeActive || (any && !activeModes.has('sway')))  ? 0 : nx;
-    const dispY     = (stabilizeActive || (any && !activeModes.has('surge'))) ? 0 : ny;
+    const dispX     = (stabilizeActive || (any && !activeModes.has('sway')))  ? 0 : nx * (axisInvert.sway  ? -1 : 1);
+    const dispY     = (stabilizeActive || (any && !activeModes.has('surge'))) ? 0 : ny * (axisInvert.surge ? -1 : 1);
     const dispYaw   = (stabilizeActive || (any && !activeModes.has('yaw')))   ? 0 : yawNorm;
     const dispPitch = (stabilizeActive || (any && !activeModes.has('pitch'))) ? 0 : currentPitch;
     const dispHeave = depthHoldActive ? depthCorrection
@@ -941,52 +1043,34 @@
 
     leftStick.style.transform = `translate(calc(-50% + ${dispX * 40}px), calc(-50% + ${dispY * 40}px))`;
 
-    if (rightStickRov) {
-      rightStickRov.style.transform = `translateY(${-dispHeave * 40}px) rotateZ(${dispYaw * 45}deg) rotateX(${dispPitch * 60}deg)`;
-    }
 
     // Always update all 5 independent gain values
-    document.getElementById('valGain').textContent     = Math.round(primaryGain   * 100) + '%';
-    document.getElementById('valVGain').textContent    = Math.round(secondaryGain * 100) + '%';
-    document.getElementById('valSwayGain').textContent = Math.round(swayGain      * 100) + '%';
-    document.getElementById('valYawGain').textContent  = Math.round(yawGain       * 100) + '%';
-    document.getElementById('valRollGain').textContent = Math.round(rollGain      * 100) + '%';
+    document.getElementById('valGain').textContent     = Math.round(surgeGain    * 100) + '%';
+    document.getElementById('valVGain').textContent    = Math.round(verticalGain * 100) + '%';
+    document.getElementById('valSwayGain').textContent = Math.round(swayGain     * 100) + '%';
+    document.getElementById('valYawGain').textContent  = Math.round(yawGain      * 100) + '%';
+    document.getElementById('valRollGain').textContent = Math.round(rollGain     * 100) + '%';
 
-    // Mode badge and highlight show which pair Gain A/B buttons currently edit
+    // Depth hold target display
+    const dTLabel = document.getElementById('depthTargetLabel');
+    const dTDisp  = document.getElementById('depthTargetDisplay');
+    if (dTLabel && dTDisp) {
+      dTLabel.style.display = depthHoldActive ? '' : 'none';
+      dTDisp.style.display  = depthHoldActive ? '' : 'none';
+      if (depthHoldActive) dTDisp.textContent = depthHoldTarget.toFixed(2) + ' m';
+    }
+
+    // Speed mode badge
     const modeTag = document.getElementById('gainModeTag');
-    const boxPri  = document.getElementById('gainBoxPrimary');
-    const boxSec  = document.getElementById('gainBoxSecondary');
-    const boxSway = document.getElementById('gainBoxSway');
-    const boxYaw  = document.getElementById('gainBoxYaw');
-    const valSway = document.getElementById('valSwayGain');
-    const valYaw  = document.getElementById('valYawGain');
-    const valPri  = document.getElementById('valGain');
-    const valSec  = document.getElementById('valVGain');
-    if (gainMode === 'sway-yaw') {
-      if (modeTag) { modeTag.textContent = 'EDITING: SWAY + YAW'; modeTag.style.borderColor = '#f59e0b'; modeTag.style.color = '#f59e0b'; modeTag.style.background = 'rgba(245,158,11,0.1)'; }
-      if (boxPri)  boxPri.style.borderColor  = '#3d2972';
-      if (boxSec)  boxSec.style.borderColor  = '#3d2972';
-      if (boxSway) boxSway.style.borderColor = '#f59e0b';
-      if (boxYaw)  boxYaw.style.borderColor  = '#f59e0b';
-      if (valPri)  valPri.style.color  = '#5b3d8a';
-      if (valSec)  valSec.style.color  = '#5b3d8a';
-      if (valSway) valSway.style.color = '#f59e0b';
-      if (valYaw)  valYaw.style.color  = '#f59e0b';
+    if (speedMode === 'fast') {
+      if (modeTag) { modeTag.textContent = 'FAST MODE'; modeTag.style.borderColor = '#f59e0b'; modeTag.style.color = '#f59e0b'; modeTag.style.background = 'rgba(245,158,11,0.1)'; }
     } else {
-      if (modeTag) { modeTag.textContent = 'EDITING: PRIMARY + SECONDARY'; modeTag.style.borderColor = '#c4b5fd'; modeTag.style.color = '#c4b5fd'; modeTag.style.background = 'rgba(196,181,253,0.1)'; }
-      if (boxPri)  boxPri.style.borderColor  = '#c4b5fd';
-      if (boxSec)  boxSec.style.borderColor  = '#a78bfa';
-      if (boxSway) boxSway.style.borderColor = '#3d2972';
-      if (boxYaw)  boxYaw.style.borderColor  = '#3d2972';
-      if (valPri)  valPri.style.color  = '#c4b5fd';
-      if (valSec)  valSec.style.color  = '#a78bfa';
-      if (valSway) valSway.style.color = '#5b3d8a';
-      if (valYaw)  valYaw.style.color  = '#5b3d8a';
+      if (modeTag) { modeTag.textContent = 'SLOW MODE'; modeTag.style.borderColor = '#22c55e'; modeTag.style.color = '#22c55e'; modeTag.style.background = 'rgba(34,197,94,0.1)'; }
     }
 
     document.getElementById('valSurge').textContent = Math.round(-dispY * 100) + '%';
     document.getElementById('valSway').textContent  = Math.round(dispX * 100) + '%';
-    document.getElementById('valHeave').textContent = Math.round(dispHeave * 100) + '%';
+    document.getElementById('valHeave').textContent = Math.round(verticalNorm * 100) + '%';
     document.getElementById('valYaw').textContent   = Math.round(dispYaw * 100) + '%';
     document.getElementById('valPitch').textContent = Math.round(dispPitch * 100) + '%';
     document.getElementById('valRoll').textContent  = Math.round(dispRoll * 100) + '%';
@@ -1114,7 +1198,7 @@
           }
         }
       } else {
-        const deadzone = (v) => Math.abs(v) < 0.2 ? 0 : v;
+        const deadzone = (v, gain) => Math.abs(v) < 0.2 * gain ? 0 : v;
 
         const calibBtn = gp.buttons[bindings.btnCalib]?.pressed;
         if (calibBtn && !btn8WasPressed) {
@@ -1130,22 +1214,28 @@
         btn8WasPressed = calibBtn;
 
         // FIX: axisX now correctly reads sway axis, axisYaw reads yaw axis
-        const raw_x        = deadzone(scaleAxis(gp.axes[bindings.axisX]        || 0, offsetX));
-        const raw_y        = deadzone(scaleAxis(gp.axes[bindings.axisY]        || 0, offsetY));
-        const raw_yaw      = deadzone(scaleAxis(gp.axes[bindings.axisYaw]      || 0, offsetYaw));
-        const raw_throttle = deadzone(scaleAxis(gp.axes[bindings.axisThrottle] || 0, offsetThrottle));
+        const raw_x        = deadzone(scaleAxis(gp.axes[bindings.axisX]        || 0, offsetX),        swayGain);
+        const raw_y        = deadzone(scaleAxis(gp.axes[bindings.axisY]        || 0, offsetY),        surgeGain);
+        const raw_yaw      = deadzone(scaleAxis(gp.axes[bindings.axisYaw]      || 0, offsetYaw),      yawGain);
+        const raw_throttle = deadzone(scaleAxis(gp.axes[bindings.axisThrottle] || 0, offsetThrottle), verticalGain);
 
         const trigger  = gp.buttons[bindings.btnTrigger]?.pressed;
         // Hat switch reads as POV axes (-1, 0, 1) — rising-edge detection per direction
         const hatX = Math.round(gp.axes[bindings.axisHatX] || 0);
         const hatY = Math.round(gp.axes[bindings.axisHatY] || 0);
 
-        // Hat Y-axis: switch gain mode (up=1 → primary+secondary, down=-1 → sway+yaw)
-        if (hatY === 1  && prevHatY !== 1)  gainMode = 'primary-secondary';
-        if (hatY === -1 && prevHatY !== -1) gainMode = 'sway-yaw';
-        // Hat X-axis: roll gain (right=1 → +, left=-1 → −)
-        if (hatX === 1  && prevHatX !== 1)  rollGain = Math.min(1.0, Math.round((rollGain + 0.1) * 10) / 10);
-        if (hatX === -1 && prevHatX !== -1) rollGain = Math.max(0.1, Math.round((rollGain - 0.1) * 10) / 10);
+        // Hat Y-axis: switch speed mode and restore that mode's stored gains
+        if (hatY === 1  && prevHatY !== 1)  {
+          speedMode = 'fast';
+          surgeGain = modeGains.fast.surge; swayGain = modeGains.fast.sway; yawGain = modeGains.fast.yaw;
+        }
+        if (hatY === -1 && prevHatY !== -1) {
+          speedMode = 'slow';
+          surgeGain = modeGains.slow.surge; swayGain = modeGains.slow.sway; yawGain = modeGains.slow.yaw;
+        }
+        // Hat X-axis: vertical gain fine-tune (right=1 → +5%, left=-1 → −5%)
+        if (hatX === 1  && prevHatX !== 1)  verticalGain = Math.min(1.0, Math.round((verticalGain + 0.05) * 20) / 20);
+        if (hatX === -1 && prevHatX !== -1) verticalGain = Math.max(0.05, Math.round((verticalGain - 0.05) * 20) / 20);
         prevHatX = hatX; prevHatY = hatY;
 
         const gainUp   = bindings.btnGainUp   >= 0 && !!gp.buttons[bindings.btnGainUp]?.pressed;
@@ -1153,17 +1243,23 @@
         const vgUp     = bindings.btnVGainUp  >= 0 && !!gp.buttons[bindings.btnVGainUp]?.pressed;
         const vgDown   = bindings.btnVGainDown >= 0 && !!gp.buttons[bindings.btnVGainDown]?.pressed;
 
-        // Gain A/B buttons are context-sensitive based on current gain mode
-        if (gainMode === 'primary-secondary') {
-          if (gainUp   && !gainUpWas)   primaryGain   = Math.min(1.0, Math.round((primaryGain   + 0.1) * 10) / 10);
-          if (gainDown && !gainDownWas) primaryGain   = Math.max(0.1, Math.round((primaryGain   - 0.1) * 10) / 10);
-          if (vgUp     && !vgUpWas)     secondaryGain = Math.min(1.0, Math.round((secondaryGain + 0.1) * 10) / 10);
-          if (vgDown   && !vgDownWas)   secondaryGain = Math.max(0.1, Math.round((secondaryGain - 0.1) * 10) / 10);
-        } else {
-          if (gainUp   && !gainUpWas)   swayGain = Math.min(1.0, Math.round((swayGain + 0.1) * 10) / 10);
-          if (gainDown && !gainDownWas) swayGain = Math.max(0.1, Math.round((swayGain - 0.1) * 10) / 10);
-          if (vgUp     && !vgUpWas)     yawGain  = Math.min(1.0, Math.round((yawGain  + 0.1) * 10) / 10);
-          if (vgDown   && !vgDownWas)   yawGain  = Math.max(0.1, Math.round((yawGain  - 0.1) * 10) / 10);
+        // Btn 4/2: surge+sway together (±5%), persisted to active mode store
+        if (gainUp && !gainUpWas) {
+          surgeGain = swayGain = Math.min(1.0, Math.round((surgeGain + 0.05) * 20) / 20);
+          modeGains[speedMode].surge = modeGains[speedMode].sway = surgeGain;
+        }
+        if (gainDown && !gainDownWas) {
+          surgeGain = swayGain = Math.max(0.05, Math.round((surgeGain - 0.05) * 20) / 20);
+          modeGains[speedMode].surge = modeGains[speedMode].sway = surgeGain;
+        }
+        // Btn 5/3: yaw only (±5%), persisted to active mode store
+        if (vgUp && !vgUpWas) {
+          yawGain = Math.min(1.0, Math.round((yawGain + 0.05) * 20) / 20);
+          modeGains[speedMode].yaw = yawGain;
+        }
+        if (vgDown && !vgDownWas) {
+          yawGain = Math.max(0.05, Math.round((yawGain - 0.05) * 20) / 20);
+          modeGains[speedMode].yaw = yawGain;
         }
         gainUpWas = gainUp; gainDownWas = gainDown; vgUpWas = vgUp; vgDownWas = vgDown;
 
@@ -1185,6 +1281,13 @@
         if (bRollH && !rollHoldWas)  setHoldMode('roll');
         if (bStab  && !stabilizeWas) setHoldMode('stabilize');
         depthHoldWas=bDepth; rollHoldWas=bRollH; stabilizeWas=bStab;
+
+        const bDepthUp=bp('btnDepthUp'), bDepthDown=bp('btnDepthDown');
+        if (depthHoldActive) {
+          if (bDepthUp   && !depthUpWas)   depthHoldTarget = Math.round((depthHoldTarget + 0.02) * 100) / 100;
+          if (bDepthDown && !depthDownWas) depthHoldTarget = Math.round((depthHoldTarget - 0.02) * 100) / 100;
+        }
+        depthUpWas = bDepthUp; depthDownWas = bDepthDown;
 
         const bArmBtn=bp('btnArm'), bDisarmBtn=bp('btnDisarm');
         if (bArmBtn    && !armBtnWas)    setArmed(true);
@@ -1208,11 +1311,11 @@
 
         let surge = 0, sway = 0, pitch = 0, roll = 0, yaw = 0;
         if (trigger) {
-          pitch = applyInvert(raw_y * primaryGain, 'pitch');
+          pitch = applyInvert(raw_y * surgeGain, 'pitch');
           roll  = applyInvert(raw_x * rollGain, 'roll');
           yaw   = applyInvert(raw_yaw * yawGain, 'yaw');
         } else {
-          surge = applyInvert(raw_y * primaryGain, 'surge');
+          surge = applyInvert(raw_y * surgeGain, 'surge');
           sway  = applyInvert(raw_x * swayGain, 'sway');
           yaw   = applyInvert(raw_yaw * yawGain, 'yaw');
         }
@@ -1220,18 +1323,13 @@
         nx = clamp(sway, -1, 1);
         ny = clamp(surge, -1, 1);
         yawNorm = clamp(yaw, -1, 1);
-        verticalNorm = clamp(applyInvert(-raw_throttle * secondaryGain, 'heave'), -1, 1);
+        verticalNorm = clamp(applyInvert(-raw_throttle * verticalGain, 'heave'), -1, 1);
         currentPitch = clamp(pitch, -1, 1);
         currentRoll  = clamp(roll, -1, 1);
 
         if (depthHoldActive) {
-          if (Math.abs(verticalNorm) > 0.05) {
-            depthHoldTarget = latestDepth;
-            depthCorrection = verticalNorm;
-          } else {
-            const dDir = axisInvert.depthHoldDir ? -1 : 1;
-            depthCorrection = clamp((depthHoldTarget - latestDepth) * DEPTH_HOLD_KP, -1, 1) * dDir;
-          }
+          const dDir = axisInvert.depthHoldDir ? -1 : 1;
+          depthCorrection = clamp((depthHoldTarget - latestDepth) * DEPTH_HOLD_KP, -1, 1) * dDir;
         }
         if (rollHoldActive) {
           const rDir = axisInvert.rollHoldDir ? -1 : 1;
