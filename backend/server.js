@@ -19,7 +19,7 @@ const TEENSY_PORT = 5000;
 const teensyUdp = dgram.createSocket('udp4');
 
 /* ================= PIXHAWK ================= */
-const PIXHAWK_PORTS = [14550, 14551, 14552, 14540];
+const PIXHAWK_PORTS = [5600];
 
 const splitter = new MavLinkPacketSplitter();
 const parser = new MavLinkPacketParser();
@@ -238,11 +238,21 @@ let gstProc = null;
 
 function startGStreamer() {
   gstProc = spawn('gst-launch-1.0', GST_ARGS);
+  gstProc.on('error', (err) => {
+    if (err.code === 'ENOENT') {
+      console.warn('⚠️ GStreamer not found — camera feed disabled');
+    } else {
+      console.warn('⚠️ GStreamer error:', err.message, '— restarting in 3s');
+      setTimeout(startGStreamer, 3000);
+    }
+    gstProc = null;
+  });
   gstProc.stdout.on('data', chunk => {
     for (const res of camClients) res.write(chunk);
   });
   gstProc.stderr.on('data', d => console.log('🎥 GStreamer:', d.toString().trim()));
-  gstProc.on('exit', code => {
+  gstProc.on('exit', (code, signal) => {
+    if (!gstProc) return; // already handled by error event
     console.log('🎥 GStreamer exited:', code, '— restarting in 3s');
     gstProc = null;
     setTimeout(startGStreamer, 3000);
