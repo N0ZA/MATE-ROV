@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Jalpari — Camera Feed</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #0d0822;
+      --border: #3d2972;
+      --tag: #c4b5fd;
+      --nosig: #5b3d8a;
+    }
+    html, body { width: 100%; height: 100%; background: #000; overflow: hidden; font-family: 'Segoe UI', sans-serif; }
+    .grid {
+      display: grid;
+      grid-template-columns: 2fr 1fr 1fr;
+      grid-template-rows: 1fr 1fr;
+      grid-template-areas:
+        "cam1 cam2 cam3"
+        "cam1 cam4 cam5";
+      gap: 6px;
+      width: 100%; height: 100%;
+      padding: 6px;
+    }
+    .box {
+      position: relative;
+      background: var(--bg);
+      border: 2px solid var(--border);
+      border-radius: 6px;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--nosig);
+      font-size: 14px;
+      font-weight: bold;
+      letter-spacing: 1px;
+    }
+    .box.cam1 { grid-area: cam1; }
+    .box.cam2 { grid-area: cam2; }
+    .box.cam3 { grid-area: cam3; }
+    .box.cam4 { grid-area: cam4; }
+    .box.cam5 { grid-area: cam5; }
+    .box img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: none;
+    }
+    .tag {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      background: rgba(0,0,0,0.7);
+      color: var(--tag);
+      font-size: 11px;
+      font-weight: bold;
+      padding: 3px 10px;
+      border-radius: 3px;
+      letter-spacing: 1px;
+      z-index: 2;
+    }
+    .box.cam1 .tag { font-size: 13px; padding: 4px 14px; }
+  </style>
+</head>
+<body>
+  <div class="grid">
+
+    <div class="box cam1">
+      <span class="tag">CAM 1 — PIXHAWK</span>
+      <img id="cam1img" alt="CAM 1"
+           onload="this.style.display='block';this.nextElementSibling.style.display='none'"
+           onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+      <span>NO SIGNAL</span>
+    </div>
+
+    <div class="box cam2">
+      <span class="tag">CAM 2</span>
+      <img id="cam2img" alt="CAM 2"
+           onload="this.style.display='block';this.nextElementSibling.style.display='none'"
+           onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+      <span>NO SIGNAL</span>
+    </div>
+
+    <div class="box cam3">
+      <span class="tag">CAM 3</span>
+      <img id="cam3img" alt="CAM 3"
+           onload="this.style.display='block';this.nextElementSibling.style.display='none'"
+           onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+      <span>NO SIGNAL</span>
+    </div>
+
+    <div class="box cam4">
+      <span class="tag">CAM 4</span>
+      <img id="cam4img" alt="CAM 4"
+           onload="this.style.display='block';this.nextElementSibling.style.display='none'"
+           onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+      <span>NO SIGNAL</span>
+    </div>
+
+    <div class="box cam5">
+      <span class="tag">CAM 5</span>
+      <img id="cam5img" alt="CAM 5"
+           onload="this.style.display='block';this.nextElementSibling.style.display='none'"
+           onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+      <span>NO SIGNAL</span>
+    </div>
+
+  </div>
+  <script>
+    const host = window.location.hostname;
+    for (let i = 1; i <= 5; i++) {
+      document.getElementById(`cam${i}img`).src = `http://${host}:3000/cam${i}`;
+    }
+  </script>
+</body>
+</html>

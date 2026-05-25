@@ -221,6 +221,14 @@ app.get('/cam1', (req, res) => {
   req.on('close', () => camClients.delete(res));
 });
 
+['cam2','cam3','cam4','cam5'].forEach(cam => {
+  app.get(`/${cam}`, (req, res) => {
+    res.setHeader('Content-Type', 'multipart/x-mixed-replace; boundary=frame');
+    res.setHeader('Cache-Control', 'no-cache');
+    req.on('close', () => {});
+  });
+});
+
 const GST_ARGS = [
   'udpsrc', 'port=5600',
   '!', 'application/x-rtp,media=video,clock-rate=90000,encoding-name=H264',
@@ -454,6 +462,13 @@ teensyTelemetry.bind(TEENSY_TELEMETRY_PORT, '0.0.0.0', () => {
 teensyUdp.bind(0);
 
 server.listen(3000, ()=>{
-  console.log('🌐 http://localhost:3000');
+  console.log('🌐 Controls → http://localhost:3000');
   console.log('🤖 Teensy:', TEENSY_IP+':'+TEENSY_PORT);
 });
+
+/* ================= CAMERA PAGE (port 3001) ================= */
+const camApp = express();
+camApp.get('/', (req, res) => res.sendFile(join(__dirname, '../frontend', 'camera.html')));
+camApp.use(express.static(join(__dirname, '../frontend')));
+const camServer = createServer(camApp);
+camServer.listen(3001, () => console.log('📷 Cameras  → http://localhost:3001'));
