@@ -221,7 +221,16 @@ app.get('/cam1', (req, res) => {
   req.on('close', () => camClients.delete(res));
 });
 
-['cam2','cam3','cam4','cam5'].forEach(cam => {
+const camClients2 = new Set();
+
+app.get('/cam2', (req, res) => {
+  res.setHeader('Content-Type', 'multipart/x-mixed-replace; boundary=frame');
+  res.setHeader('Cache-Control', 'no-cache');
+  camClients2.add(res);
+  req.on('close', () => camClients2.delete(res));
+});
+
+['cam3','cam4','cam5'].forEach(cam => {
   app.get(`/${cam}`, (req, res) => {
     res.setHeader('Content-Type', 'multipart/x-mixed-replace; boundary=frame');
     res.setHeader('Cache-Control', 'no-cache');
@@ -269,8 +278,48 @@ function startGStreamer() {
 
 startGStreamer();
 
+/* ================= CAM 2 — RTSP ================= */
+const RTSP_URL = 'rtsp://192.168.2.64:554';
+const GST_RTSP_ARGS = [
+  'rtspsrc', `location=${RTSP_URL}`, 'latency=0', 'protocols=tcp',
+  '!', 'decodebin',
+  '!', 'nvvidconv',
+  '!', 'video/x-raw,format=I420',
+  '!', 'jpegenc', 'quality=80',
+  '!', 'multipartmux', 'boundary=frame',
+  '!', 'fdsink', 'fd=1'
+];
+
+let gstProc2 = null;
+
+function startRtspCamera() {
+  gstProc2 = spawn('gst-launch-1.0', GST_RTSP_ARGS);
+  gstProc2.on('error', (err) => {
+    if (err.code === 'ENOENT') {
+      console.warn('⚠️ GStreamer not found — RTSP cam disabled');
+    } else {
+      console.warn('⚠️ RTSP cam error:', err.message, '— restarting in 5s');
+      setTimeout(startRtspCamera, 5000);
+    }
+    gstProc2 = null;
+  });
+  gstProc2.stdout.on('data', chunk => {
+    for (const res of camClients2) res.write(chunk);
+  });
+  gstProc2.stderr.on('data', d => console.log('📷 RTSP cam:', d.toString().trim()));
+  gstProc2.on('exit', (code, signal) => {
+    if (!gstProc2) return;
+    console.log('📷 RTSP cam exited:', code, '— restarting in 5s');
+    gstProc2 = null;
+    setTimeout(startRtspCamera, 5000);
+  });
+}
+
+startRtspCamera();
+
 function shutdown() {
-  if (gstProc) { gstProc.kill(); gstProc = null; }
+  if (gstProc)  { gstProc.kill();  gstProc  = null; }
+  if (gstProc2) { gstProc2.kill(); gstProc2 = null; }
   process.exit(0);
 }
 process.on('SIGTERM', shutdown);
