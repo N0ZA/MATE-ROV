@@ -18,7 +18,7 @@
     html, body { margin: 0; padding: 0; height: 100%; background: var(--bg2); color: #f8fafc; font-family: 'Segoe UI', sans-serif; }
     body { overflow: hidden; }
     * { box-sizing: border-box; }
-    .main-layout { display: grid; grid-template-columns: 320px 1fr 340px; gap: 12px; height: 100vh; padding: 10px; min-width: 0; }
+    .main-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; height: 100vh; padding: 10px; min-width: 0; }
     .card { background: var(--bg1); padding: 10px; border-radius: 8px; border: 1px solid var(--p); }
     .column { display: flex; flex-direction: column; gap: 10px; height: 100%; min-height: 0; }
     .left-column { overflow-y: auto; padding-right: 4px; min-height: 0; }
@@ -26,7 +26,7 @@
 
     .dual-gimbals { display: flex; justify-content: space-between; gap: 10px; padding: 10px 0; }
     .gimbal-wrap { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 5px; }
-    .gimbal-label { font-size: 10px; color: var(--s1); text-transform: uppercase; font-weight: bold; }
+    .gimbal-label { font-size: 12px; color: var(--s1); text-transform: uppercase; font-weight: bold; }
     .trackpad { width: 100%; aspect-ratio: 1 / 1; border-radius: 50%; border: 2px solid var(--p); background: radial-gradient(circle at center, var(--bg1), var(--bg2)); position: relative; overflow: hidden; box-shadow: inset 0 0 15px rgba(0,0,0,0.5); }
     .trackpad::before, .trackpad::after { content: ""; position: absolute; background: var(--p); }
     .trackpad::before { left: 50%; top: 0; width: 2px; height: 100%; transform: translateX(-50%); }
@@ -51,14 +51,14 @@
     .rov-map-container { display: flex; justify-content: center; padding: 15px 0; }
     .rov-hull { width: 120px; height: 180px; border: 2px solid var(--p1); border-radius: 20px; position: relative; background: rgba(15, 23, 42, 0.5); }
     .rov-nose { position: absolute; top: -10px; left: 50%; transform: translateX(-50%); width: 40px; height: 10px; background: #f97316; border-radius: 5px 5px 0 0; z-index: 3; box-shadow: 0 0 10px #f97316; }
-    .thruster-node { position: absolute; width: 24px; height: 36px; background: var(--p); border-radius: 6px; border: 2px solid var(--bg1); transition: background-color 0.1s linear, box-shadow 0.1s linear; display: flex; align-items: center; justify-content: center; font-size: 9px; font-weight: bold; color: rgba(255,255,255,0.4); }
+    .thruster-node { position: absolute; width: 24px; height: 36px; background: var(--p); border-radius: 6px; border: 2px solid var(--bg1); transition: background-color 0.1s linear, box-shadow 0.1s linear; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: bold; color: rgba(255,255,255,0.4); }
     .node-fl { top: -10px; left: -15px; transform: rotate(-45deg); }
     .node-fr { top: -10px; right: -15px; transform: rotate(45deg); }
     .node-rl { bottom: -10px; left: -15px; transform: rotate(45deg); }
     .node-rr { bottom: -10px; right: -15px; transform: rotate(-45deg); }
     .node-vl { top: 50%; left: -18px; transform: translateY(-50%); border-radius: 50%; width: 30px; height: 30px; }
     .node-vr { top: 50%; right: -18px; transform: translateY(-50%); border-radius: 50%; width: 30px; height: 30px; }
-    .pwm-label { position: absolute; font-size: 8px; font-family: monospace; font-weight: bold; color: var(--s1); white-space: nowrap; }
+    .pwm-label { position: absolute; font-size: 10px; font-family: monospace; font-weight: bold; color: var(--s1); white-space: nowrap; }
     #pwmFL { top: 8px; left: 6px; }
     #pwmFR { top: 8px; right: 6px; }
     #pwmRL { bottom: 8px; left: 6px; }
@@ -70,7 +70,7 @@
     .box-grid-2x2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .box-grid-3x2 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
     .value-box { background: var(--bg3); border: 1px solid #23314c; border-radius: 10px; padding: 10px; min-height: 60px; text-align: center; }
-    .value-box .value { font-size: 18px; font-weight: 700; color: var(--s); font-family: Consolas, monospace; margin-top: 4px;}
+    .value-box .value { font-size: 20px; font-weight: 700; color: var(--s); font-family: Consolas, monospace; margin-top: 4px;}
     .camera-grid { display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: repeat(2, minmax(120px, 1fr)); gap: 8px; height: 100%; min-height: 0; }
     .video-box { background: #000; border: 2px solid var(--p1); border-radius: 4px; display: flex; align-items: center; justify-content: center; position: relative; color: var(--p1); font-weight: bold; font-size: 12px; min-height: 120px; }
     .cam-tag { position: absolute; top: 8px; left: 8px; background: rgba(0,0,0,0.7); font-size: 10px; padding: 3px 8px; color: var(--s); border-radius: 2px; }
@@ -79,34 +79,39 @@
     .yaw-needle { width: 4px; height: 38px; background: #ef4444; position: absolute; left: 50%; bottom: 50%; transform-origin: bottom center; transition: transform 0.05s linear; }
     .horizon-wrap { width: 100%; height: 100%; position: absolute; top: 0; left: 0; overflow: hidden; border-radius: 50%; }
     .horizon-line { width: 90%; height: 2px; background: #22c55e; position: absolute; top: 50%; left: 50%; transform-origin: center center; transition: transform 0.05s linear; }
-    h3 { font-size: 11px; margin: 0 0 8px 0; color: var(--s); text-transform: uppercase; letter-spacing: 1px; border-bottom: 1px solid var(--p); padding-bottom: 4px; }
-    .label { font-size: 10px; color: var(--s1); text-transform: uppercase; }
-    .val-num { font-family: monospace; font-size: 18px; color: var(--s); font-weight: bold; }
+    h3 { font-size: 13px; margin: 0 0 8px 0; color: var(--s); text-transform: uppercase; letter-spacing: 1px; border-bottom: 1px solid var(--p); padding-bottom: 4px; }
+    .label { font-size: 12px; color: var(--s1); text-transform: uppercase; }
+    .val-num { font-family: monospace; font-size: 20px; color: var(--s); font-weight: bold; }
     #conn { font-weight: bold; margin-left: 6px; }
     .dir-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 5px; margin-top: 5px; }
-    .dir-btn { padding: 4px; font-size: 10px; cursor: pointer; border: 1px solid var(--p); border-radius: 3px; background: var(--p); color: white; }
-    .sel-btn { padding: 4px; font-size: 10px; cursor: pointer; border: 1px solid var(--p); border-radius: 3px; background: var(--p); color: white; font-weight: bold; }
-    .arm-state-btn { flex: 1; padding: 8px; font-size: 12px; font-weight: bold; cursor: pointer; border-radius: 4px; border: 2px solid var(--p1); background: var(--p); color: var(--s1); }
+    .dir-btn { padding: 4px; font-size: 12px; cursor: pointer; border: 1px solid var(--p); border-radius: 3px; background: var(--p); color: white; }
+    .sel-btn { padding: 4px; font-size: 12px; cursor: pointer; border: 1px solid var(--p); border-radius: 3px; background: var(--p); color: white; font-weight: bold; }
+    .arm-state-btn { flex: 1; padding: 8px; font-size: 14px; font-weight: bold; cursor: pointer; border-radius: 4px; border: 2px solid var(--p1); background: var(--p); color: var(--s1); }
     #btn-arm.active    { background: #16a34a; border-color: #22c55e; color: #fff; box-shadow: 0 0 8px #22c55e44; }
     #btn-disarm.active { background: #b91c1c; border-color: #ef4444; color: #fff; box-shadow: 0 0 8px #ef444444; }
 
     .arm-container { margin-top: 3px; }
-    .arm-section { margin-bottom: 6px; }
-    .arm-section-title { font-size: 10px; color: var(--s); font-weight: bold; margin-bottom: 3px; display: block; }
-    .arm-slider-row { display: flex; align-items: center; gap: 4px; margin-bottom: 2px; }
-    .arm-slider-label { font-size: 9px; color: var(--s1); width: 60px; text-transform: uppercase; flex-shrink: 0; }
-    .arm-slider { flex: 1; min-width: 0; height: 15px; -webkit-appearance: none; appearance: none; background: var(--bg3); border-radius: 3px; border: 1px solid var(--p); outline: none; }
-    .arm-slider::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 13px; height: 13px; border-radius: 50%; background: #facc15; cursor: pointer; border: 2px solid #f97316; }
-    .arm-slider::-moz-range-thumb { width: 13px; height: 13px; border-radius: 50%; background: #facc15; cursor: pointer; border: 2px solid #f97316; }
-    .arm-slider-value { font-size: 9px; font-family: Consolas, monospace; color: #facc15; width: 38px; text-align: right; flex-shrink: 0; }
+    .arm-section { margin-bottom: 10px; }
+    .arm-section-title { font-size: 13px; color: var(--s); font-weight: bold; margin-bottom: 5px; display: block; }
+    .arm-slider-row { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
+    .arm-slider-label { font-size: 12px; color: var(--s1); width: 64px; text-transform: uppercase; flex-shrink: 0; }
+    .arm-slider { flex: 1; min-width: 0; height: 24px; -webkit-appearance: none; appearance: none; background: var(--bg3); border-radius: 6px; border: 1px solid var(--p); outline: none; cursor: pointer; }
+    .arm-slider::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 28px; height: 28px; border-radius: 50%; background: #facc15; cursor: pointer; border: 3px solid #f97316; box-shadow: 0 0 6px rgba(249,115,22,0.5); }
+    .arm-slider::-moz-range-thumb { width: 28px; height: 28px; border-radius: 50%; background: #facc15; cursor: pointer; border: 3px solid #f97316; box-shadow: 0 0 6px rgba(249,115,22,0.5); }
+    .arm-slider-value { font-size: 13px; font-family: Consolas, monospace; color: #facc15; width: 42px; text-align: right; flex-shrink: 0; }
     .gripper-controls { display: flex; gap: 5px; }
-    .gripper-controls button { background: var(--p); border: 1px solid var(--p1); color: white; padding: 5px 8px; border-radius: 4px; cursor: pointer; font-size: 10px; font-weight: bold; }
+    .gripper-controls button { background: var(--p); border: 1px solid var(--p1); color: white; padding: 5px 8px; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: bold; }
     .gripper-controls button.active { background: var(--s); border-color: var(--s); box-shadow: 0 0 8px var(--s); }
-    .rotate-pwm-btn { background: var(--p); border: 1px solid var(--p1); color: #facc15; padding: 3px 5px; border-radius: 4px; cursor: pointer; font-size: 9px; font-weight: bold; flex-shrink: 0; }
+    .rotate-pwm-btn { background: var(--p); border: 1px solid var(--p1); color: #facc15; padding: 3px 5px; border-radius: 4px; cursor: pointer; font-size: 11px; font-weight: bold; flex-shrink: 0; }
     .rotate-pwm-btn:active { background: #f97316; border-color: #f97316; }
 
+    /* ====== CAMERA BANNER (shown if popup blocked) ====== */
+    #cam-banner { display:none; position:fixed; top:0; left:0; right:0; z-index:300; background:#1e1240; border-bottom:2px solid #7c3aed; padding:8px 16px; text-align:center; font-size:13px; color:#c4b5fd; }
+    #cam-banner a { color:#facc15; font-weight:bold; text-decoration:none; margin:0 8px; }
+    #cam-banner a:hover { text-decoration:underline; }
+
     /* ====== SETTINGS BUTTON ====== */
-    .settings-btn { position: fixed; bottom: 16px; right: 16px; z-index: 100; background: var(--bg1); border: 1px solid var(--p); color: var(--s1); padding: 7px 14px; border-radius: 6px; cursor: pointer; font-size: 11px; letter-spacing: 1px; }
+    .settings-btn { position: fixed; bottom: 16px; right: 16px; z-index: 100; background: var(--bg1); border: 1px solid var(--p); color: var(--s1); padding: 7px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; letter-spacing: 1px; }
     .settings-btn:hover { border-color: var(--s); color: var(--s); }
 
     /* ====== SETTINGS MODAL ====== */
@@ -116,46 +121,46 @@
 
     /* Settings tabs */
     .modal-tabs { display: flex; border-bottom: 1px solid var(--p); }
-    .modal-tab { flex: 1; padding: 12px 8px; font-size: 11px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; cursor: pointer; background: transparent; border: none; color: var(--p1); border-bottom: 2px solid transparent; margin-bottom: -1px; transition: color 0.15s, border-color 0.15s; }
+    .modal-tab { flex: 1; padding: 12px 8px; font-size: 13px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; cursor: pointer; background: transparent; border: none; color: var(--p1); border-bottom: 2px solid transparent; margin-bottom: -1px; transition: color 0.15s, border-color 0.15s; }
     .modal-tab:hover { color: var(--s1); }
     .modal-tab.active { color: var(--s); border-bottom-color: var(--s); }
 
     .modal-body { padding: 20px; max-height: 70vh; overflow-y: auto; }
-    .modal-title { font-size: 12px; color: var(--s); text-transform: uppercase; letter-spacing: 2px; margin: 0 0 4px 0; }
-    .modal-hint { font-size: 10px; color: var(--p1); margin: 0 0 14px 0; }
+    .modal-title { font-size: 14px; color: var(--s); text-transform: uppercase; letter-spacing: 2px; margin: 0 0 4px 0; }
+    .modal-hint { font-size: 12px; color: var(--p1); margin: 0 0 14px 0; }
 
     /* Tab panels */
     .tab-panel { display: none; }
     .tab-panel.active { display: block; }
 
     /* Axis inversion rows */
-    .invert-section-title { font-size: 10px; color: var(--p1); text-transform: uppercase; letter-spacing: 1px; margin: 14px 0 6px 0; padding-bottom: 4px; border-bottom: 1px solid var(--p); }
+    .invert-section-title { font-size: 12px; color: var(--p1); text-transform: uppercase; letter-spacing: 1px; margin: 14px 0 6px 0; padding-bottom: 4px; border-bottom: 1px solid var(--p); }
     .invert-row { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--bg2); }
-    .invert-label { flex: 1; font-size: 11px; color: var(--s1); }
-    .invert-desc { font-size: 10px; color: var(--p1); width: 180px; }
-    .toggle-btn { width: 80px; padding: 5px 10px; font-size: 10px; font-weight: bold; text-transform: uppercase; border-radius: 4px; border: 1px solid var(--p1); background: var(--p); color: var(--s1); cursor: pointer; transition: all 0.15s; text-align: center; letter-spacing: 0.5px; }
+    .invert-label { flex: 1; font-size: 13px; color: var(--s1); }
+    .invert-desc { font-size: 12px; color: var(--p1); width: 180px; }
+    .toggle-btn { width: 80px; padding: 5px 10px; font-size: 12px; font-weight: bold; text-transform: uppercase; border-radius: 4px; border: 1px solid var(--p1); background: var(--p); color: var(--s1); cursor: pointer; transition: all 0.15s; text-align: center; letter-spacing: 0.5px; }
     .toggle-btn.reversed { background: #ef4444; border-color: #ef4444; color: #fff; box-shadow: 0 0 8px rgba(239,68,68,0.4); }
     .toggle-btn.normal { background: #22c55e; border-color: #22c55e; color: #000; box-shadow: 0 0 8px rgba(34,197,94,0.3); }
 
     /* Bindings */
-    .binding-section { font-size: 10px; color: var(--p1); text-transform: uppercase; letter-spacing: 1px; margin: 12px 0 4px 0; }
+    .binding-section { font-size: 12px; color: var(--p1); text-transform: uppercase; letter-spacing: 1px; margin: 12px 0 4px 0; }
     .binding-row { display: flex; align-items: center; gap: 10px; padding: 7px 0; border-bottom: 1px solid var(--bg2); }
-    .binding-label { flex: 1; font-size: 11px; color: var(--s1); }
-    .binding-value { font-family: Consolas, monospace; font-size: 11px; color: #facc15; width: 110px; text-align: center; background: var(--bg2); padding: 3px 6px; border-radius: 4px; border: 1px solid var(--p); }
+    .binding-label { flex: 1; font-size: 13px; color: var(--s1); }
+    .binding-value { font-family: Consolas, monospace; font-size: 13px; color: #facc15; width: 110px; text-align: center; background: var(--bg2); padding: 3px 6px; border-radius: 4px; border: 1px solid var(--p); }
     .binding-value.listening { color: #f97316; border-color: #f97316; animation: blink 0.7s infinite; }
     @keyframes blink { 0%,100% { opacity:1; } 50% { opacity:0.35; } }
-    .remap-btn { background: var(--p); border: 1px solid var(--p1); color: #f8fafc; padding: 3px 10px; border-radius: 4px; cursor: pointer; font-size: 10px; white-space: nowrap; }
+    .remap-btn { background: var(--p); border: 1px solid var(--p1); color: #f8fafc; padding: 3px 10px; border-radius: 4px; cursor: pointer; font-size: 12px; white-space: nowrap; }
     .remap-btn:hover { border-color: var(--s); }
     .remap-btn.active { background: #f97316; border-color: #f97316; }
 
     .modal-footer { display: flex; gap: 10px; padding: 14px 20px; border-top: 1px solid var(--p); justify-content: flex-end; background: var(--bg1); }
-    .modal-footer button { padding: 6px 16px; border-radius: 5px; border: 1px solid var(--p); background: var(--bg2); color: #f8fafc; cursor: pointer; font-size: 11px; }
+    .modal-footer button { padding: 6px 16px; border-radius: 5px; border: 1px solid var(--p); background: var(--bg2); color: #f8fafc; cursor: pointer; font-size: 13px; }
     .modal-close-btn { border-color: var(--s) !important; color: var(--s) !important; }
     .modal-reset-btn { color: #ef4444 !important; border-color: #ef4444 !important; }
     .modal-save-btn { border-color: #22c55e !important; color: #22c55e !important; }
 
     /* Info note */
-    .info-note { background: var(--bg2); border: 1px solid var(--p); border-radius: 6px; padding: 8px 12px; font-size: 10px; color: var(--p1); margin-bottom: 14px; line-height: 1.5; }
+    .info-note { background: var(--bg2); border: 1px solid var(--p); border-radius: 6px; padding: 8px 12px; font-size: 12px; color: var(--p1); margin-bottom: 14px; line-height: 1.5; }
     .info-note span { color: var(--s); }
 
     /* Theme color pickers */
@@ -205,17 +210,6 @@
         </div>
       </div>
 
-      <div class="card">
-        <h3>FLIGHT CONTROLS</h3>
-        <div class="dual-gimbals">
-          <div class="gimbal-wrap">
-            <div class="gimbal-label">Sway / Surge</div>
-            <div class="trackpad" id="trackpad">
-              <div class="joystick-dot" id="leftStick"></div>
-            </div>
-          </div>
-        </div>
-      </div>
 
       <div class="card">
         <h3>ARM CONTROLS</h3>
@@ -279,32 +273,45 @@
       </div>
     </div>
 
-    <div class="camera-column">
-      <div class="camera-grid">
-        <div class="video-box" style="padding:0;overflow:hidden;">
-          <span class="cam-tag">CAM 1</span>
-          <img src="/cam1" style="width:100%;height:100%;object-fit:cover;" alt="CAM 1"
-               onerror="this.style.display='none';this.nextElementSibling.style.display='block'"
-               onload="this.style.display='block';this.nextElementSibling.style.display='none'">
-          <span id="cam1Label">NO SIGNAL</span>
-        </div>
-        <div class="video-box"><span class="cam-tag">CAM 2</span>NO SIGNAL</div>
-        <div class="video-box"><span class="cam-tag">CAM 3</span>NO SIGNAL</div>
-        <div class="video-box"><span class="cam-tag">CAM 4</span>NO SIGNAL</div>
-      </div>
-    </div>
 
     <div class="column right-column">
-      <div class="card" style="text-align:center;">
+      <div class="card">
         <h3>ORIENTATION</h3>
-        <div class="label">STATUS <span id="conn">DISCONNECTED</span></div>
-        <div class="compass"><div class="yaw-needle" id="yaw-needle"></div></div>
-        <div style="font-size:11px; margin-top:3px;">YAW: <span id="yv">0.0</span>°</div>
-        <div class="label" style="margin-top:10px;">PITCH & ROLL</div>
-        <div class="compass" style="border-color:#22c55e;">
-          <div class="horizon-wrap"><div class="horizon-line" id="pr-line"></div></div>
+        <div class="label" style="text-align:center;">STATUS <span id="conn">DISCONNECTED</span></div>
+        <button onclick="resetOrientation()" style="margin:6px auto 0; display:block; background:transparent; border:1px solid var(--p1); color:var(--s1); border-radius:4px; padding:3px 10px; font-size:10px; font-weight:bold; letter-spacing:1px; cursor:pointer; transition:border-color 0.15s,color 0.15s; text-transform:uppercase;" onmouseover="this.style.borderColor='var(--s)';this.style.color='var(--s)'" onmouseout="this.style.borderColor='var(--p1)';this.style.color='var(--s1)'">↺ RESET</button>
+
+        <!-- Gauges side by side -->
+        <div style="display:flex; justify-content:center; gap:12px; margin-top:6px;">
+          <div style="text-align:center;">
+            <div class="label">YAW</div>
+            <div class="compass"><div class="yaw-needle" id="yaw-needle"></div></div>
+            <div style="font-size:11px; margin-top:3px;"><span id="yv">0.0</span>°</div>
+          </div>
+          <div style="text-align:center;">
+            <div class="label">PITCH & ROLL</div>
+            <div class="compass" style="border-color:#22c55e;">
+              <div class="horizon-wrap"><div class="horizon-line" id="pr-line"></div></div>
+            </div>
+            <div style="font-size:11px; margin-top:3px;">P: <span id="pv">0</span>° | R: <span id="rv">0</span>°</div>
+          </div>
         </div>
-        <div style="font-size:11px; margin-top:5px;">P: <span id="pv">0</span>° | R: <span id="rv">0</span>°</div>
+
+        <!-- Flight control + depth sensor -->
+        <div style="display:flex; gap:12px; margin-top:12px; align-items:flex-start;">
+          <div style="flex:1; display:flex; flex-direction:column; align-items:center; gap:4px;">
+            <div class="label">FLIGHT CONTROL</div>
+            <div class="gimbal-label">Sway / Surge</div>
+            <div class="trackpad" id="trackpad" style="width:90px; height:90px;">
+              <div class="joystick-dot" id="leftStick"></div>
+            </div>
+          </div>
+          <div style="flex:1; display:flex; flex-direction:column; justify-content:center; gap:2px; padding-top:16px;">
+            <div class="label">Depth</div>
+            <div class="val-num" id="depth">0.00 m</div>
+            <div class="label" id="depthTargetLabel" style="display:none; margin-top:6px;">Target</div>
+            <div class="val-num" id="depthTargetDisplay" style="display:none; color:#f59e0b;">0.00 m</div>
+          </div>
+        </div>
       </div>
 
       <div class="card">
@@ -346,14 +353,17 @@
 
       <div class="card">
         <h3>SENSORS</h3>
-        <div class="label">Depth</div>
-        <div class="val-num" id="depth">0.00 m</div>
-        <div class="label" id="depthTargetLabel" style="display:none; margin-top:4px;">Target</div>
-        <div class="val-num" id="depthTargetDisplay" style="display:none; color:#f59e0b;">0.00 m</div>
-        <div class="label" style="margin-top:10px;">Network</div>
+        <div class="label">Network</div>
         <div style="color:#22c55e; font-weight:bold;"><span id="ping">0</span> ms</div>
       </div>
     </div>
+  </div>
+
+  <!-- Camera popup fallback banner -->
+  <div id="cam-banner">
+    Camera feed tab was blocked by your browser.
+    <a id="cam-banner-link" href="#" target="_blank">Open Camera Feed</a>
+    <a href="#" onclick="document.getElementById('cam-banner').style.display='none';return false;">✕</a>
   </div>
 
   <!-- Settings button -->
@@ -501,6 +511,26 @@
             <button class="sel-btn" id="mbtn-pitch" onclick="setMode('pitch')">PITCH</button>
             <button class="sel-btn" id="mbtn-roll"  onclick="setMode('roll')">ROLL</button>
           </div>
+          <div class="theme-picker-row" style="margin-top:16px;">
+            <div class="invert-label">Depth Step</div>
+            <div class="invert-desc">Depth hold target change per button press (m)</div>
+            <input type="number" id="depthHoldStepInput"
+                   min="0.01" max="1.0" step="0.01" value="0.02"
+                   style="width:72px; background:var(--bg2); border:1px solid var(--p1); color:#facc15;
+                          border-radius:4px; padding:4px 6px; font-size:13px; text-align:center;"
+                   oninput="setDepthHoldStep(this.value)">
+            <span style="font-family:Consolas,monospace; color:#facc15; font-size:12px; width:36px;">m</span>
+          </div>
+          <div class="theme-picker-row" style="margin-top:10px;">
+            <div class="invert-label">Gain Step</div>
+            <div class="invert-desc">Gain change per button press (5% default)</div>
+            <input type="number" id="gainStepInput"
+                   min="0.01" max="0.5" step="0.01" value="0.05"
+                   style="width:72px; background:var(--bg2); border:1px solid var(--p1); color:#facc15;
+                          border-radius:4px; padding:4px 6px; font-size:13px; text-align:center;"
+                   oninput="setGainStep(this.value)">
+            <span style="font-family:Consolas,monospace; color:#facc15; font-size:12px; width:36px;">× 100%</span>
+          </div>
         </div>
 
         <div class="tab-panel" id="tab-theme">
@@ -518,6 +548,14 @@
             <input type="color" id="colorSecondary" value="#c4b5fd"
                    oninput="applyTheme(document.getElementById('colorPrimary').value, this.value)">
           </div>
+          <div class="theme-picker-row">
+            <div class="invert-label">Font Size</div>
+            <div class="invert-desc">Scale all UI text &amp; spacing</div>
+            <input type="range" id="fontSizeSlider" min="0.75" max="1.5" step="0.05" value="1.0"
+                   oninput="applyFontSize(this.value)"
+                   style="flex:1; cursor:pointer;">
+            <span id="fontSizeLabel" style="font-family:Consolas,monospace; color:#facc15; width:44px; text-align:right; font-size:12px;">100%</span>
+          </div>
           <div style="margin-top:14px;">
             <button class="remap-btn" onclick="resetTheme()">Reset to Default</button>
           </div>
@@ -534,6 +572,18 @@
   </div>
 
 <script>
+  // Auto-open camera feed tab when controls page loads
+  (function() {
+    const camUrl = `http://${window.location.hostname}:3001`;
+    const w = window.open(camUrl, 'jalpari-cameras');
+    if (!w || w.closed) {
+      // Popup was blocked — show the fallback banner
+      const banner = document.getElementById('cam-banner');
+      const link   = document.getElementById('cam-banner-link');
+      if (banner) { link.href = camUrl; banner.style.display = 'block'; }
+    }
+  })();
+
   const socket = io();
   const dirGrid = document.getElementById('dir-grid');
 
@@ -607,6 +657,8 @@
   });
 
   let yawAccum = 0; let lastYaw = null; let gpIndex = null;
+  let yawOrigin = 0, pitchDisplayOffset = 0, rollDisplayOffset = 0;
+  let latestPitchDeg = 0;
   let pixhawkTimeout = null;
 
   socket.on('disconnect', () => {
@@ -640,18 +692,22 @@
       yawAccum += delta;
     }
     lastYaw = yaw;
-    const pitchMove = Math.max(-18, Math.min(18, pitch * -2));
+    const yawDisplay   = yawAccum - yawOrigin;
+    const pitchDisplay = pitch - pitchDisplayOffset;
+    const rollDisplay  = roll  - rollDisplayOffset;
+    const pitchMove = Math.max(-18, Math.min(18, pitchDisplay * -2));
 
-    document.getElementById('yaw-needle').style.transform = `translateX(-50%) rotate(${yawAccum - 90}deg)`;
-    document.getElementById('pr-line').style.transform = `translate(-50%, ${pitchMove}px) rotate(${roll}deg)`;
-    document.getElementById('yv').innerText = yawAccum.toFixed(1);
-    document.getElementById('pv').innerText = pitch.toFixed(1);
-    document.getElementById('rv').innerText = roll.toFixed(1);
+    document.getElementById('yaw-needle').style.transform = `translateX(-50%) rotate(${yawDisplay - 90}deg)`;
+    document.getElementById('pr-line').style.transform = `translate(-50%, ${pitchMove}px) rotate(${rollDisplay}deg)`;
+    document.getElementById('yv').innerText = yawDisplay.toFixed(1);
+    document.getElementById('pv').innerText = pitchDisplay.toFixed(1);
+    document.getElementById('rv').innerText = rollDisplay.toFixed(1);
     document.getElementById('depth').innerText = ((data.depth ?? 0).toFixed ? (data.depth ?? 0).toFixed(2) : '0.00') + ' m';
     document.getElementById('ping').innerText = Math.round(data.ping ?? 0);
 
-    latestRollDeg = roll;
-    latestDepth   = Number(data.depth) || 0;
+    latestRollDeg  = roll;
+    latestPitchDeg = pitch;
+    latestDepth    = Number(data.depth) || 0;
   });
 
   const leftStick = document.getElementById('leftStick');
@@ -670,10 +726,9 @@
   let speedMode = 'fast'; // 'fast' | 'slow'
   let surgeGain = 0.65, verticalGain = 0.50, currentPitch = 0, currentRoll = 0;
   let swayGain = 0.65, yawGain = 0.65, rollGain = 0.50;
+  let gainStep = parseFloat(localStorage.getItem('gainStep') || '0.05');
   let prevHatX = 0, prevHatY = 0;
   let gainUpWas = false, gainDownWas = false, vgUpWas = false, vgDownWas = false;
-  let modeSurgeWas=false, modeSwayWas=false, modeHeaveWas=false,
-      modeYawWas=false, modePitchWas=false, modeRollWas=false;
   let depthHoldWas=false, rollHoldWas=false, stabilizeWas=false;
   let depthUpWas=false, depthDownWas=false;
   let arm1Rot1100Was=false, arm1Rot1900Was=false,
@@ -741,6 +796,12 @@
     });
   }
 
+  function resetOrientation() {
+    yawOrigin          = yawAccum;
+    pitchDisplayOffset = latestPitchDeg;
+    rollDisplayOffset  = latestRollDeg;
+  }
+
   /* ============ ARM / DISARM ============ */
   let isArmed = false;
 
@@ -760,8 +821,10 @@
   const ROLL_HOLD_KP  = 0.02; // deg^-1: 50° error → full roll correction
 
   let depthHoldActive = false, depthHoldTarget = 0;
+  let depthHoldStep = parseFloat(localStorage.getItem('depthHoldStep') || '0.02');
   let rollHoldActive  = true,  rollHoldTarget  = 0;
   let stabilizeActive = false;
+  let preStabilizeDepthHold = false, preStabilizeRollHold = false;
 
   let latestDepth   = 0;
   let latestRollDeg = 0;
@@ -780,11 +843,15 @@
     } else if (mode === 'stabilize') {
       stabilizeActive = !stabilizeActive;
       if (stabilizeActive) {
+        preStabilizeDepthHold = depthHoldActive;
+        preStabilizeRollHold  = rollHoldActive;
         depthHoldActive = true;  depthHoldTarget = latestDepth;
         rollHoldActive  = true;
       } else {
-        depthHoldActive = false; depthCorrection = 0;
-        rollHoldActive  = false; rollCorrection  = 0;
+        depthHoldActive = preStabilizeDepthHold;
+        rollHoldActive  = preStabilizeRollHold;
+        if (!depthHoldActive) depthCorrection = 0;
+        if (!rollHoldActive)  rollCorrection  = 0;
       }
     }
     renderHoldButtons();
@@ -813,8 +880,6 @@
     btnTrigger: 0, btnCalib: 8,
     btnGainUp: 4, btnGainDown: 2, btnVGainUp: 5, btnVGainDown: 3,
     axisHatX: 4, axisHatY: 5,
-    btnModeSurge: -1, btnModeSway: -1, btnModeHeave: -1,
-    btnModeYaw: -1, btnModePitch: -1, btnModeRoll: -1,
     btnDepthHold: -1, btnRollHold: -1, btnStabilize: -1,
     btnDepthUp: -1, btnDepthDown: -1,
     btnArm1Rotate1100: -1, btnArm1Rotate1900: -1,
@@ -822,7 +887,11 @@
     btnArm: -1, btnDisarm: -1,
   };
 
+  const DOF_BIND_KEYS = ['btnModeSurge','btnModeSway','btnModeHeave','btnModeYaw','btnModePitch','btnModeRoll'];
+  function scrubDofBindings() { DOF_BIND_KEYS.forEach(k => delete bindings[k]); saveBindings(); }
+
   let bindings = JSON.parse(localStorage.getItem('gpBindings') || 'null') || {...DEFAULT_BINDINGS};
+  scrubDofBindings(); // purge any stale DOF keys from localStorage
 
   function saveBindings() { localStorage.setItem('gpBindings', JSON.stringify(bindings)); }
 
@@ -867,15 +936,44 @@
     set('--s1',  hslToHex(...clampHsl(sH, sS - 60, sL - 14)));
   }
 
+  function setDepthHoldStep(val) {
+    const v = Math.max(0.01, Math.min(1.0, parseFloat(val) || 0.02));
+    depthHoldStep = v;
+    localStorage.setItem('depthHoldStep', v);
+    const inp = document.getElementById('depthHoldStepInput');
+    if (inp) inp.value = v;
+  }
+
+  function setGainStep(val) {
+    const v = Math.max(0.01, Math.min(0.5, parseFloat(val) || 0.05));
+    gainStep = v;
+    localStorage.setItem('gainStep', v);
+    const inp = document.getElementById('gainStepInput');
+    if (inp) inp.value = v;
+  }
+
+  function applyFontSize(scale) {
+    const s = parseFloat(scale);
+    document.querySelector('.main-layout').style.zoom = s;
+    document.querySelector('.modal').style.zoom = s;
+    const lbl = document.getElementById('fontSizeLabel');
+    if (lbl) lbl.textContent = Math.round(s * 100) + '%';
+    const sl = document.getElementById('fontSizeSlider');
+    if (sl) sl.value = s;
+    localStorage.setItem('uiScale', s);
+  }
+
   function resetTheme() {
     const p = '#3d2972', s = '#c4b5fd';
     document.getElementById('colorPrimary').value   = p;
     document.getElementById('colorSecondary').value = s;
     applyTheme(p, s);
     localStorage.removeItem('themeColors');
+    applyFontSize(1);
+    localStorage.removeItem('uiScale');
   }
 
-  // Restore saved theme on load
+  // Restore saved theme and font scale on load
   (function() {
     const saved = JSON.parse(localStorage.getItem('themeColors') || 'null');
     if (saved) {
@@ -883,6 +981,7 @@
       document.getElementById('colorSecondary').value = saved.secondary;
       applyTheme(saved.primary, saved.secondary);
     }
+    applyFontSize(parseFloat(localStorage.getItem('uiScale') || '1'));
   })();
 
   function saveBindingsToDisk() {
@@ -904,7 +1003,7 @@
       .catch(() => alert('Save failed — check server connection'));
   }
 
-  fetch('/api/bindings').then(r => r.json()).then(data => { bindings = { ...DEFAULT_BINDINGS, ...data }; saveBindings(); }).catch(() => {});
+  fetch('/api/bindings').then(r => r.json()).then(data => { bindings = { ...DEFAULT_BINDINGS, ...data }; scrubDofBindings(); }).catch(() => {});
   fetch('/api/invert').then(r => r.json()).then(data => { axisInvert = { ...DEFAULT_INVERT, ...data }; saveInvert(); renderInvertButtons(); }).catch(() => {});
 
   const BINDING_META = [
@@ -923,13 +1022,6 @@
     { section: 'Hat Switch (Gain Mode & Roll Gain)' },
     { key: 'axisHatX', label: 'Hat X (Roll Gain ←/→)',             type: 'axis' },
     { key: 'axisHatY', label: 'Hat Y (Mode ↑ Primary / ↓ Sway+Yaw)', type: 'axis' },
-    { section: 'DOF Mode Buttons' },
-    { key: 'btnModeSurge', label: 'Mode: Surge', type: 'button' },
-    { key: 'btnModeSway',  label: 'Mode: Sway',  type: 'button' },
-    { key: 'btnModeHeave', label: 'Mode: Heave', type: 'button' },
-    { key: 'btnModeYaw',   label: 'Mode: Yaw',   type: 'button' },
-    { key: 'btnModePitch', label: 'Mode: Pitch', type: 'button' },
-    { key: 'btnModeRoll',  label: 'Mode: Roll',  type: 'button' },
     { section: 'Hold Modes' },
     { key: 'btnDepthHold', label: 'Depth Hold',      type: 'button' },
     { key: 'btnRollHold',  label: 'Roll Hold',       type: 'button' },
@@ -986,6 +1078,10 @@
   function openSettings() {
     renderInvertButtons();
     renderBindings();
+    const dsi = document.getElementById('depthHoldStepInput');
+    if (dsi) dsi.value = depthHoldStep;
+    const gsi = document.getElementById('gainStepInput');
+    if (gsi) gsi.value = gainStep;
     document.getElementById('settingsModal').classList.add('open');
   }
 
@@ -1182,6 +1278,7 @@
     const gp = gpIndex !== null ? pads[gpIndex] : pads[0];
 
     if (gp) {
+      lastGpSeen = Date.now();
       if (remapTarget !== null) {
         const meta = BINDING_META.find(m => m.key === remapTarget);
         if (meta?.type === 'axis') {
@@ -1198,7 +1295,7 @@
           }
         }
       } else {
-        const deadzone = (v, gain) => Math.abs(v) < 0.2 * gain ? 0 : v;
+        const deadzone = (v, gain) => Math.abs(v) < 0.2 * gain * gain ? 0 : v;
 
         const calibBtn = gp.buttons[bindings.btnCalib]?.pressed;
         if (calibBtn && !btn8WasPressed) {
@@ -1234,8 +1331,8 @@
           surgeGain = modeGains.slow.surge; swayGain = modeGains.slow.sway; yawGain = modeGains.slow.yaw;
         }
         // Hat X-axis: vertical gain fine-tune (right=1 → +5%, left=-1 → −5%)
-        if (hatX === 1  && prevHatX !== 1)  verticalGain = Math.min(1.0, Math.round((verticalGain + 0.05) * 20) / 20);
-        if (hatX === -1 && prevHatX !== -1) verticalGain = Math.max(0.05, Math.round((verticalGain - 0.05) * 20) / 20);
+        if (hatX === 1  && prevHatX !== 1)  verticalGain = Math.min(1.0, Math.round((verticalGain + gainStep) * 100) / 100);
+        if (hatX === -1 && prevHatX !== -1) verticalGain = Math.max(0.05, Math.round((verticalGain - gainStep) * 100) / 100);
         prevHatX = hatX; prevHatY = hatY;
 
         const gainUp   = bindings.btnGainUp   >= 0 && !!gp.buttons[bindings.btnGainUp]?.pressed;
@@ -1243,38 +1340,27 @@
         const vgUp     = bindings.btnVGainUp  >= 0 && !!gp.buttons[bindings.btnVGainUp]?.pressed;
         const vgDown   = bindings.btnVGainDown >= 0 && !!gp.buttons[bindings.btnVGainDown]?.pressed;
 
-        // Btn 4/2: surge+sway together (±5%), persisted to active mode store
+        // Btn 4/2: surge+sway together, persisted to active mode store
         if (gainUp && !gainUpWas) {
-          surgeGain = swayGain = Math.min(1.0, Math.round((surgeGain + 0.05) * 20) / 20);
+          surgeGain = swayGain = Math.min(1.0, Math.round((surgeGain + gainStep) * 100) / 100);
           modeGains[speedMode].surge = modeGains[speedMode].sway = surgeGain;
         }
         if (gainDown && !gainDownWas) {
-          surgeGain = swayGain = Math.max(0.05, Math.round((surgeGain - 0.05) * 20) / 20);
+          surgeGain = swayGain = Math.max(0.05, Math.round((surgeGain - gainStep) * 100) / 100);
           modeGains[speedMode].surge = modeGains[speedMode].sway = surgeGain;
         }
-        // Btn 5/3: yaw only (±5%), persisted to active mode store
+        // Btn 5/3: yaw only, persisted to active mode store
         if (vgUp && !vgUpWas) {
-          yawGain = Math.min(1.0, Math.round((yawGain + 0.05) * 20) / 20);
+          yawGain = Math.min(1.0, Math.round((yawGain + gainStep) * 100) / 100);
           modeGains[speedMode].yaw = yawGain;
         }
         if (vgDown && !vgDownWas) {
-          yawGain = Math.max(0.05, Math.round((yawGain - 0.05) * 20) / 20);
+          yawGain = Math.max(0.05, Math.round((yawGain - gainStep) * 100) / 100);
           modeGains[speedMode].yaw = yawGain;
         }
         gainUpWas = gainUp; gainDownWas = gainDown; vgUpWas = vgUp; vgDownWas = vgDown;
 
         const bp = key => bindings[key] >= 0 && !!gp.buttons[bindings[key]]?.pressed;
-        const bSurge=bp('btnModeSurge'), bSway=bp('btnModeSway'), bHeave=bp('btnModeHeave');
-        const bYaw=bp('btnModeYaw'), bPitch=bp('btnModePitch'), bRoll=bp('btnModeRoll');
-
-        if (bSurge && !modeSurgeWas) setMode('surge');
-        if (bSway  && !modeSwayWas)  setMode('sway');
-        if (bHeave && !modeHeaveWas) setMode('heave');
-        if (bYaw   && !modeYawWas)   setMode('yaw');
-        if (bPitch && !modePitchWas) setMode('pitch');
-        if (bRoll  && !modeRollWas)  setMode('roll');
-        modeSurgeWas=bSurge; modeSwayWas=bSway; modeHeaveWas=bHeave;
-        modeYawWas=bYaw; modePitchWas=bPitch; modeRollWas=bRoll;
 
         const bDepth=bp('btnDepthHold'), bRollH=bp('btnRollHold'), bStab=bp('btnStabilize');
         if (bDepth && !depthHoldWas) setHoldMode('depth');
@@ -1284,8 +1370,8 @@
 
         const bDepthUp=bp('btnDepthUp'), bDepthDown=bp('btnDepthDown');
         if (depthHoldActive) {
-          if (bDepthUp   && !depthUpWas)   depthHoldTarget = Math.round((depthHoldTarget + 0.02) * 100) / 100;
-          if (bDepthDown && !depthDownWas) depthHoldTarget = Math.round((depthHoldTarget - 0.02) * 100) / 100;
+          if (bDepthUp   && !depthUpWas)   depthHoldTarget = Math.round((depthHoldTarget + depthHoldStep) * 1000) / 1000;
+          if (bDepthDown && !depthDownWas) depthHoldTarget = Math.round((depthHoldTarget - depthHoldStep) * 1000) / 1000;
         }
         depthUpWas = bDepthUp; depthDownWas = bDepthDown;
 
@@ -1339,13 +1425,24 @@
         updateThrusters();
         emitJoystick();
       }
+    } else {
+      // Gamepad missing — only zero axes after 300 ms of absence.
+      // Brief dropouts (buttons 10/11/12 cause a 1–2 frame USB mode-switch) are
+      // ignored so the ROV keeps its last commanded thrust through the glitch.
+      if (Date.now() - lastGpSeen > 300) {
+        nx = 0; ny = 0; yawNorm = 0; verticalNorm = 0; currentPitch = 0; currentRoll = 0;
+        updateThrusters();
+        emitJoystick();
+      }
     }
     requestAnimationFrame(pollGamepad);
   }
 
+  let pollRunning = false;
+  let lastGpSeen  = Date.now();
   window.addEventListener('gamepadconnected', (e) => {
     gpIndex = e.gamepad.index;
-    requestAnimationFrame(pollGamepad);
+    if (!pollRunning) { pollRunning = true; requestAnimationFrame(pollGamepad); }
   });
 
   /* ============ ARM ============ */
