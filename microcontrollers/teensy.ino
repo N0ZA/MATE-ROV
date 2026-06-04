@@ -32,7 +32,67 @@ unsigned int surfaceTelemetryPort = 5001;
 // =====================================================
 // IMU CONFIG
 // =====================================================
+// =====================================================
+// RM3100 CONFIG
+// =====================================================
 
+#define RM3100_ADDR   0x22
+#define RM3100_CCX    0x04
+#define RM3100_CMM    0x01
+#define RM3100_TMRC   0x0B
+#define RM3100_MX     0x24
+#define RM3100_STATUS 0x34
+#define RM3100_REVID  0x36
+#define RM3100_CC     200
+
+const float magGain = (0.3671f * RM3100_CC) + 1.5f;
+float mx = 0, my = 0, mz = 0;
+bool magOk = false;
+
+void rm3100WriteReg(uint8_t reg, uint8_t val) {
+  Wire.beginTransmission(RM3100_ADDR);
+  Wire.write(reg); Wire.write(val);
+  Wire.endTransmission();
+}
+
+void rm3100WriteReg16(uint8_t reg, uint16_t val) {
+  Wire.beginTransmission(RM3100_ADDR);
+  Wire.write(reg);
+  Wire.write((val >> 8) & 0xFF);
+  Wire.write(val & 0xFF);
+  Wire.endTransmission();
+}
+
+uint8_t rm3100ReadReg(uint8_t reg) {
+  Wire.beginTransmission(RM3100_ADDR);
+  Wire.write(reg);
+  Wire.endTransmission(false);
+  Wire.requestFrom((uint8_t)RM3100_ADDR, (uint8_t)1);
+  return Wire.available() ? Wire.read() : 0xFF;
+}
+
+bool rm3100DataReady() {
+  return (rm3100ReadReg(RM3100_STATUS) & 0x80);
+}
+
+void rm3100ReadMag(float &ox, float &oy, float &oz) {
+  Wire.beginTransmission(RM3100_ADDR);
+  Wire.write(RM3100_MX);
+  Wire.endTransmission(false);
+  Wire.requestFrom((uint8_t)RM3100_ADDR, (uint8_t)9);
+  uint8_t buf[9];
+  for (int i = 0; i < 9; i++)
+    buf[i] = Wire.available() ? Wire.read() : 0;
+  int32_t rx = ((int32_t)buf[0] << 16) | ((uint32_t)buf[1] << 8) | buf[2];
+  int32_t ry = ((int32_t)buf[3] << 16) | ((uint32_t)buf[4] << 8) | buf[5];
+  int32_t rz = ((int32_t)buf[6] << 16) | ((uint32_t)buf[7] << 8) | buf[8];
+  if (rx & 0x800000) rx |= 0xFF000000;
+  if (ry & 0x800000) ry |= 0xFF000000;
+  if (rz & 0x800000) rz |= 0xFF000000;
+  ox = (float)rx / magGain;
+  oy = (float)ry / magGain;
+  oz = (float)rz / magGain;
+}
 Adafruit_ISM330DHCX ism;
 Madgwick filter;
 
@@ -300,7 +360,6 @@ void calibrateSensors() {
 // =====================================================
 // IMU READ
 // =====================================================
-
 void readIMU() {
   if (!imuOk) return;
 
@@ -312,20 +371,24 @@ void readIMU() {
   lastUpdate = now;
   if (dt <= 0 || dt > 0.1f) dt = 0.01f;
 
-  filter.updateIMU(
-    gyro.gyro.x * 57.2958f,
-    gyro.gyro.y * 57.2958f,
-    gyro.gyro.z * 57.2958f,
-    accel.acceleration.x,
-    accel.acceleration.y,
-    accel.acceleration.z
-  );
+  float gx = gyro.gyro.x * 57.2958f;
+  float gy = gyro.gyro.y * 57.2958f;
+  float gz = gyro.gyro.z * 57.2958f;
+  float ax = accel.acceleration.x;
+  float ay = accel.acceleration.y;
+  float az = accel.acceleration.z;
 
-  roll = filter.getRoll();
+  if (magOk && rm3100DataReady()) {
+    rm3100ReadMag(mx, my, mz);
+    filter.update(gx, gy, gz, ax, ay, az, mx, my, mz);  // 9-DOF fusion
+  } else {
+    filter.updateIMU(gx, gy, gz, ax, ay, az);            // fallback
+  }
+
+  roll  = filter.getRoll();
   pitch = filter.getPitch();
-  yaw = filter.getYaw();
+  yaw   = filter.getYaw();
 }
-
 // =====================================================
 // BAR30 READ
 // =====================================================
@@ -397,6 +460,22 @@ void setup() {
     lastUpdate = micros();
     Serial.println("IMU online.");
     logMsg("IMU online");
+  }
+  
+  // RM3100 init 
+  uint8_t revid = rm3100ReadReg(RM3100_REVID);
+  if (revid != 0x22) {
+    Serial.println("WARNING: RM3100 not found — yaw will drift");
+    magOk = false;
+  } else {
+    rm3100WriteReg16(RM3100_CCX,     RM3100_CC);
+    rm3100WriteReg16(RM3100_CCX + 2, RM3100_CC);
+    rm3100WriteReg16(RM3100_CCX + 4, RM3100_CC);
+    rm3100WriteReg(RM3100_TMRC, 0x96);
+    rm3100WriteReg(RM3100_CMM,  0x71);
+    magOk = true;
+    Serial.println("RM3100 online.");
+    logMsg("RM3100 online");
   }
 
   if (!bar30.init()) {

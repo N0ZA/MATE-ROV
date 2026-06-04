@@ -1,0 +1,16 @@
+[Unit]
+Description=MATE ROV Backend Server
+After=network.target
+
+[Service]
+Type=simple
+User=orin
+WorkingDirectory=/home/orin/MATE-ROV/backend
+ExecStart=/usr/bin/node server.js
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

@@ -230,22 +230,41 @@ app.get('/cam2', (req, res) => {
   req.on('close', () => camClients2.delete(res));
 });
 
-['cam3','cam4','cam5'].forEach(cam => {
-  app.get(`/${cam}`, (req, res) => {
-    res.setHeader('Content-Type', 'multipart/x-mixed-replace; boundary=frame');
-    res.setHeader('Cache-Control', 'no-cache');
-    req.on('close', () => {});
-  });
+const camClients3 = new Set();
+
+app.get('/cam3', (req, res) => {
+  res.setHeader('Content-Type', 'multipart/x-mixed-replace; boundary=frame');
+  res.setHeader('Cache-Control', 'no-cache');
+  camClients3.add(res);
+  req.on('close', () => camClients3.delete(res));
 });
 
+const camClients4 = new Set();
+
+app.get('/cam4', (req, res) => {
+  res.setHeader('Content-Type', 'multipart/x-mixed-replace; boundary=frame');
+  res.setHeader('Cache-Control', 'no-cache');
+  camClients4.add(res);
+  req.on('close', () => camClients4.delete(res));
+});
+
+const camClients5 = new Set();
+
+app.get('/cam5', (req, res) => {
+  res.setHeader('Content-Type', 'multipart/x-mixed-replace; boundary=frame');
+  res.setHeader('Cache-Control', 'no-cache');
+  camClients5.add(res);
+  req.on('close', () => camClients5.delete(res));
+});
+
+const RTSP_URL1 = 'rtsp://192.168.2.2:8554/video_udp_stream_0';
 const GST_ARGS = [
-  'udpsrc', 'port=5600',
-  '!', 'application/x-rtp,media=video,clock-rate=90000,encoding-name=H264',
-  '!', 'rtph264depay', '!', 'h264parse',
+  'rtspsrc', `location=${RTSP_URL1}`, 'latency=0', 'protocols=tcp',
+  '!', 'rtph264depay',
+  '!', 'video/x-h264,stream-format=byte-stream,alignment=au',
   '!', 'nvv4l2decoder',
   '!', 'nvvidconv',
   '!', 'video/x-raw,format=I420',
-  '!', 'videoflip', 'method=rotate-180',
   '!', 'jpegenc', 'quality=80',
   '!', 'multipartmux', 'boundary=frame',
   '!', 'fdsink', 'fd=1'
@@ -279,10 +298,11 @@ function startGStreamer() {
 startGStreamer();
 
 /* ================= CAM 2 — RTSP ================= */
-const RTSP_URL = 'rtsp://192.168.2.64:554';
+const RTSP_URL = 'rtsp://admin:admin@192.168.2.12:554/live/0/SUB';
 const GST_RTSP_ARGS = [
   'rtspsrc', `location=${RTSP_URL}`, 'latency=0', 'protocols=tcp',
-  '!', 'decodebin',
+  '!', 'rtph265depay',
+  '!', 'nvv4l2decoder',
   '!', 'nvvidconv',
   '!', 'video/x-raw,format=I420',
   '!', 'jpegenc', 'quality=80',
@@ -317,9 +337,132 @@ function startRtspCamera() {
 
 startRtspCamera();
 
+/* ================= CAM 3 — RTSP ================= */
+const RTSP_URL3 = 'rtsp://admin:Admin123@192.168.2.13:554/live/0/SUB';
+const GST_RTSP_ARGS3 = [
+  'rtspsrc', `location=${RTSP_URL3}`, 'latency=0', 'protocols=tcp',
+  '!', 'rtph265depay',
+  '!', 'nvv4l2decoder',
+  '!', 'nvvidconv',
+  '!', 'video/x-raw,format=I420',
+  '!', 'jpegenc', 'quality=80',
+  '!', 'multipartmux', 'boundary=frame',
+  '!', 'fdsink', 'fd=1'
+];
+
+let gstProc3 = null;
+
+function startRtspCamera3() {
+  gstProc3 = spawn('gst-launch-1.0', GST_RTSP_ARGS3);
+  gstProc3.on('error', (err) => {
+    if (err.code === 'ENOENT') {
+      console.warn('⚠️ GStreamer not found — cam3 disabled');
+    } else {
+      console.warn('⚠️ Cam3 error:', err.message, '— restarting in 5s');
+      setTimeout(startRtspCamera3, 5000);
+    }
+    gstProc3 = null;
+  });
+  gstProc3.stdout.on('data', chunk => {
+    for (const res of camClients3) res.write(chunk);
+  });
+  gstProc3.stderr.on('data', d => console.log('📷 Cam3:', d.toString().trim()));
+  gstProc3.on('exit', (code, signal) => {
+    if (!gstProc3) return;
+    console.log('📷 Cam3 exited:', code, '— restarting in 5s');
+    gstProc3 = null;
+    setTimeout(startRtspCamera3, 5000);
+  });
+}
+
+startRtspCamera3();
+
+/* ================= CAM 4 — RTSP ================= */
+const RTSP_URL4 = 'rtsp://admin:Admin123@192.168.2.14:554/live/0/SUB';
+const GST_RTSP_ARGS4 = [
+  'rtspsrc', `location=${RTSP_URL4}`, 'latency=0', 'protocols=tcp',
+  '!', 'rtph265depay',
+  '!', 'nvv4l2decoder',
+  '!', 'nvvidconv',
+  '!', 'video/x-raw,format=I420',
+  '!', 'jpegenc', 'quality=80',
+  '!', 'multipartmux', 'boundary=frame',
+  '!', 'fdsink', 'fd=1'
+];
+
+let gstProc4 = null;
+
+function startRtspCamera4() {
+  gstProc4 = spawn('gst-launch-1.0', GST_RTSP_ARGS4);
+  gstProc4.on('error', (err) => {
+    if (err.code === 'ENOENT') {
+      console.warn('⚠️ GStreamer not found — cam4 disabled');
+    } else {
+      console.warn('⚠️ Cam4 error:', err.message, '— restarting in 5s');
+      setTimeout(startRtspCamera4, 5000);
+    }
+    gstProc4 = null;
+  });
+  gstProc4.stdout.on('data', chunk => {
+    for (const res of camClients4) res.write(chunk);
+  });
+  gstProc4.stderr.on('data', d => console.log('📷 Cam4:', d.toString().trim()));
+  gstProc4.on('exit', (code, signal) => {
+    if (!gstProc4) return;
+    console.log('📷 Cam4 exited:', code, '— restarting in 5s');
+    gstProc4 = null;
+    setTimeout(startRtspCamera4, 5000);
+  });
+}
+
+startRtspCamera4();
+
+/* ================= CAM 5 — RTSP ================= */
+const RTSP_URL5 = 'rtsp://admin:Admin123@192.168.2.15:554/live/0/SUB';
+const GST_RTSP_ARGS5 = [
+  'rtspsrc', `location=${RTSP_URL5}`, 'latency=0', 'protocols=tcp',
+  '!', 'rtph265depay',
+  '!', 'nvv4l2decoder',
+  '!', 'nvvidconv',
+  '!', 'video/x-raw,format=I420',
+  '!', 'jpegenc', 'quality=80',
+  '!', 'multipartmux', 'boundary=frame',
+  '!', 'fdsink', 'fd=1'
+];
+
+let gstProc5 = null;
+
+function startRtspCamera5() {
+  gstProc5 = spawn('gst-launch-1.0', GST_RTSP_ARGS5);
+  gstProc5.on('error', (err) => {
+    if (err.code === 'ENOENT') {
+      console.warn('⚠️ GStreamer not found — cam5 disabled');
+    } else {
+      console.warn('⚠️ Cam5 error:', err.message, '— restarting in 5s');
+      setTimeout(startRtspCamera5, 5000);
+    }
+    gstProc5 = null;
+  });
+  gstProc5.stdout.on('data', chunk => {
+    for (const res of camClients5) res.write(chunk);
+  });
+  gstProc5.stderr.on('data', d => console.log('📷 Cam5:', d.toString().trim()));
+  gstProc5.on('exit', (code, signal) => {
+    if (!gstProc5) return;
+    console.log('📷 Cam5 exited:', code, '— restarting in 5s');
+    gstProc5 = null;
+    setTimeout(startRtspCamera5, 5000);
+  });
+}
+
+startRtspCamera5();
+
 function shutdown() {
   if (gstProc)  { gstProc.kill();  gstProc  = null; }
   if (gstProc2) { gstProc2.kill(); gstProc2 = null; }
+  if (gstProc3) { gstProc3.kill(); gstProc3 = null; }
+  if (gstProc4) { gstProc4.kill(); gstProc4 = null; }
+  if (gstProc5) { gstProc5.kill(); gstProc5 = null; }
   process.exit(0);
 }
 process.on('SIGTERM', shutdown);
@@ -488,17 +631,19 @@ io.on('connection', socket=>{
   });
 });
 
-/* ================= TEENSY TELEMETRY (roll + depth) ================= */
-const TEENSY_TELEMETRY_PORT = 5000;
+/* ================= TEENSY TELEMETRY [roll,pitch,yaw,depth] ================= */
+const TEENSY_TELEMETRY_PORT = 5001;
 const teensyTelemetry = dgram.createSocket('udp4');
 
 teensyTelemetry.on('message', (raw) => {
   try {
     const telemetry = JSON.parse(raw.toString().trim());
-    if (!Array.isArray(telemetry) || telemetry.length < 2) return;
-    const [roll, depth] = telemetry;
-    if (!isNaN(roll))  latestRobotData.roll  = Number(roll.toFixed(1));
-    if (!isNaN(depth)) latestRobotData.depth = Number(Math.max(0, depth).toFixed(2));
+    if (!Array.isArray(telemetry) || telemetry.length < 4) return;
+    const [roll, pitch, yaw, depth] = telemetry;
+    if (!isNaN(roll))  latestRobotData.roll  = Number(roll.toFixed(2));
+    if (!isNaN(pitch)) latestRobotData.pitch = Number(pitch.toFixed(2));
+    if (!isNaN(yaw))   latestRobotData.yaw   = Number(yaw.toFixed(2));
+    if (!isNaN(depth)) latestRobotData.depth = Number(Math.max(0, depth).toFixed(3));
     io.emit('robot-data', { ...latestRobotData });
   } catch (e) {}
 });
