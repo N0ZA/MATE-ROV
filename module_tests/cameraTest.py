@@ -1,9 +1,9 @@
 import cv2
 
-cap = cv2.VideoCapture('udp://192.168.2.1:5600')
+cap = cv2.VideoCapture('udp://192.168.2.15:5004')
 
 if not cap.isOpened():
-    print("Error opening UDP stream. Check IP/port/firewall.")
+    print("Error opening RTSP stream. Check IP/port/firewall.")
     exit()
 
 while True:

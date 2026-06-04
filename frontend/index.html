@@ -656,7 +656,8 @@
     else { arm2GripperClose.classList.remove('active'); arm2GripperOpen.classList.remove('active'); }
   });
 
-  let yawAccum = 0; let lastYaw = null; let gpIndex = null;
+  let yawAccum = 0; let lastYaw = null; let gpIndex = null; let gpArmIndex = null;
+  const ARM_SLOW_GAIN = 0.3, ARM_NORMAL_GAIN = 0.6, ARM_FAST_GAIN = 1.0;
   let yawOrigin = 0, pitchDisplayOffset = 0, rollDisplayOffset = 0;
   let latestPitchDeg = 0;
   let pixhawkTimeout = null;
@@ -895,6 +896,53 @@
 
   function saveBindings() { localStorage.setItem('gpBindings', JSON.stringify(bindings)); }
 
+  /* ============ ARM BINDINGS (DualSense) ============ */
+  const DEFAULT_ARM_BINDINGS = {
+    axisLeftX:          0,  // left arm slew (Left X)
+    axisLeftY:          1,  // left arm shoulder (Left Y)
+    axisRightX:         2,  // right arm slew (Right X)
+    axisRightY:         3,  // right arm shoulder (Right Y)
+    btnSlowMode:        4,  // L1
+    btnFastMode:        5,  // R1
+    // R2 modifier — right arm rotate + gripper
+    btnR2Mod:           7,  // R2
+    btnArm1RotateCCW:   2,  // Square
+    btnArm1RotateCW:    1,  // Circle
+    btnArm1GripperOpen: 3,  // Triangle
+    btnArm1GripperClose:0,  // Cross
+    // L2 modifier — left arm rotate + gripper
+    btnL2Mod:           6,  // L2
+    btnArm2RotateCCW:  14,  // D-Pad Left
+    btnArm2RotateCW:   15,  // D-Pad Right
+    btnArm2GripperOpen:12,  // D-Pad Up
+    btnArm2GripperClose:13, // D-Pad Down
+  };
+  let armBindings = JSON.parse(localStorage.getItem('gpArmBindings') || 'null') || {...DEFAULT_ARM_BINDINGS};
+  function saveArmBindings() { localStorage.setItem('gpArmBindings', JSON.stringify(armBindings)); }
+
+  const ARM_BINDING_META = [
+    { section: 'DualSense — Arm Axes' },
+    { key: 'axisLeftX',           label: 'Left Arm Slew',              type: 'axis',   controller: 'arm' },
+    { key: 'axisLeftY',           label: 'Left Arm Shoulder',          type: 'axis',   controller: 'arm' },
+    { key: 'axisRightX',          label: 'Right Arm Slew',             type: 'axis',   controller: 'arm' },
+    { key: 'axisRightY',          label: 'Right Arm Shoulder',         type: 'axis',   controller: 'arm' },
+    { section: 'Arm Speed Mode' },
+    { key: 'btnSlowMode',         label: 'Slow Mode (L1)',              type: 'button', controller: 'arm' },
+    { key: 'btnFastMode',         label: 'Fast Mode (R1)',              type: 'button', controller: 'arm' },
+    { section: 'Right Arm — Hold R2 + button' },
+    { key: 'btnR2Mod',            label: 'R2 (Modifier)',               type: 'button', controller: 'arm' },
+    { key: 'btnArm1RotateCCW',    label: 'Rotate Anticlockwise (□)',   type: 'button', controller: 'arm' },
+    { key: 'btnArm1RotateCW',     label: 'Rotate Clockwise (○)',       type: 'button', controller: 'arm' },
+    { key: 'btnArm1GripperOpen',  label: 'Gripper Open (△)',           type: 'button', controller: 'arm' },
+    { key: 'btnArm1GripperClose', label: 'Gripper Close (✕)',          type: 'button', controller: 'arm' },
+    { section: 'Left Arm — Hold L2 + button' },
+    { key: 'btnL2Mod',            label: 'L2 (Modifier)',               type: 'button', controller: 'arm' },
+    { key: 'btnArm2RotateCCW',    label: 'Rotate Anticlockwise (←)',   type: 'button', controller: 'arm' },
+    { key: 'btnArm2RotateCW',     label: 'Rotate Clockwise (→)',       type: 'button', controller: 'arm' },
+    { key: 'btnArm2GripperOpen',  label: 'Gripper Open (↑)',           type: 'button', controller: 'arm' },
+    { key: 'btnArm2GripperClose', label: 'Gripper Close (↓)',          type: 'button', controller: 'arm' },
+  ];
+
   /* ============ THEME ============ */
   function hexToHsl(hex) {
     let r = parseInt(hex.slice(1,3),16)/255, g = parseInt(hex.slice(3,5),16)/255, b = parseInt(hex.slice(5,7),16)/255;
@@ -1039,6 +1087,7 @@
   ];
 
   let remapTarget = null;
+  let remapController = null; // 'flight' | 'arm'
   let activeTab = 'tab-axes';
 
   function switchTab(tabId) {
@@ -1056,21 +1105,23 @@
   function renderBindings() {
     const list = document.getElementById('bindingsList');
     list.innerHTML = '';
-    for (const item of BINDING_META) {
+    const allMeta = [...BINDING_META, ...ARM_BINDING_META];
+    for (const item of allMeta) {
       if (item.section) {
         list.innerHTML += `<div class="binding-section">${item.section}</div>`;
         continue;
       }
-      const { key, label, type } = item;
-      const listening = remapTarget === key;
+      const { key, label, type, controller = 'flight' } = item;
+      const src = controller === 'arm' ? armBindings : bindings;
+      const listening = remapTarget === key && remapController === controller;
       const valueText = listening
         ? `Move ${type}...`
-        : `${type === 'axis' ? 'Axis' : 'Button'} ${bindings[key]}`;
+        : `${type === 'axis' ? 'Axis' : 'Button'} ${src[key]}`;
       list.innerHTML += `
         <div class="binding-row">
           <div class="binding-label">${label}</div>
           <div class="binding-value${listening ? ' listening' : ''}">${valueText}</div>
-          <button class="remap-btn${listening ? ' active' : ''}" onclick="startRemap('${key}')">${listening ? 'Cancel' : 'Remap'}</button>
+          <button class="remap-btn${listening ? ' active' : ''}" onclick="startRemap('${key}','${controller}')">${listening ? 'Cancel' : 'Remap'}</button>
         </div>`;
     }
   }
@@ -1101,12 +1152,18 @@
       renderInvertButtons();
     } else if (activeTab === 'tab-bindings') {
       bindings = {...DEFAULT_BINDINGS};
+      armBindings = {...DEFAULT_ARM_BINDINGS};
       saveBindings();
+      saveArmBindings();
       renderBindings();
     }
   }
 
-  function startRemap(key) { remapTarget = remapTarget === key ? null : key; renderBindings(); }
+  function startRemap(key, controller = 'flight') {
+    if (remapTarget === key && remapController === controller) { remapTarget = null; remapController = null; }
+    else { remapTarget = key; remapController = controller; }
+    renderBindings();
+  }
 
   /* ============ CONTROL MATH ============ */
   function styleThrusterNode(element, pwm) {
@@ -1279,22 +1336,22 @@
 
     if (gp) {
       lastGpSeen = Date.now();
-      if (remapTarget !== null) {
+      if (remapTarget !== null && remapController === 'flight') {
         const meta = BINDING_META.find(m => m.key === remapTarget);
         if (meta?.type === 'axis') {
           for (let i = 0; i < gp.axes.length; i++) {
             if (Math.abs(gp.axes[i]) > 0.7) {
-              bindings[remapTarget] = i; saveBindings(); remapTarget = null; renderBindings(); break;
+              bindings[remapTarget] = i; saveBindings(); remapTarget = null; remapController = null; renderBindings(); break;
             }
           }
         } else if (meta?.type === 'button') {
           for (let i = 0; i < gp.buttons.length; i++) {
             if (gp.buttons[i]?.pressed) {
-              bindings[remapTarget] = i; saveBindings(); remapTarget = null; renderBindings(); break;
+              bindings[remapTarget] = i; saveBindings(); remapTarget = null; remapController = null; renderBindings(); break;
             }
           }
         }
-      } else {
+      } else if (remapTarget === null) {
         const deadzone = (v, gain) => Math.abs(v) < 0.2 * gain * gain ? 0 : v;
 
         const calibBtn = gp.buttons[bindings.btnCalib]?.pressed;
@@ -1435,13 +1492,83 @@
         emitJoystick();
       }
     }
+    // --- DualSense arm controller ---
+    const armGp = gpArmIndex !== null ? pads[gpArmIndex] : null;
+    if (armGp) {
+      if (remapTarget !== null && remapController === 'arm') {
+        const meta = ARM_BINDING_META.find(m => m.key === remapTarget);
+        if (meta?.type === 'axis') {
+          for (let i = 0; i < armGp.axes.length; i++) {
+            if (Math.abs(armGp.axes[i]) > 0.7) {
+              armBindings[remapTarget] = i; saveArmBindings(); remapTarget = null; remapController = null; renderBindings(); break;
+            }
+          }
+        } else if (meta?.type === 'button') {
+          for (let i = 0; i < armGp.buttons.length; i++) {
+            if (armGp.buttons[i]?.pressed) {
+              armBindings[remapTarget] = i; saveArmBindings(); remapTarget = null; remapController = null; renderBindings(); break;
+            }
+          }
+        }
+      } else if (remapTarget === null) {
+        const slowMode = !!armGp.buttons[armBindings.btnSlowMode]?.pressed;
+        const fastMode = !!armGp.buttons[armBindings.btnFastMode]?.pressed;
+        const armGain  = slowMode ? ARM_SLOW_GAIN : fastMode ? ARM_FAST_GAIN : ARM_NORMAL_GAIN;
+        const armDz = v => Math.abs(v) < 0.05 ? 0 : v;
+        const axPwm = v => Math.max(1000, Math.min(2000, Math.round(1500 + armDz(v) * armGain * 500)));
+
+        const setArmSlider = (id, pwm) => {
+          const el = document.getElementById(id);
+          if (el) { el.value = pwm; updateArmValue(id); }
+        };
+
+        setArmSlider('arm2_slew',     axPwm(armGp.axes[armBindings.axisLeftX]  || 0));
+        setArmSlider('arm2_shoulder', axPwm(armGp.axes[armBindings.axisLeftY]  || 0));
+        setArmSlider('arm1_slew',     axPwm(armGp.axes[armBindings.axisRightX] || 0));
+        setArmSlider('arm1_shoulder', axPwm(armGp.axes[armBindings.axisRightY] || 0));
+
+        // R2-modified: right arm rotate (PWM scales with trigger depth) + gripper
+        const r2Value  = armGp.buttons[armBindings.btnR2Mod]?.value ?? 0;
+        const r2Held   = r2Value > 0.05;
+        const rotCCW   = r2Held && !!armGp.buttons[armBindings.btnArm1RotateCCW]?.pressed;
+        const rotCW    = r2Held && !!armGp.buttons[armBindings.btnArm1RotateCW]?.pressed;
+        const arm1RotPwm = rotCCW ? Math.round(1500 - r2Value * 500)
+                         : rotCW  ? Math.round(1500 + r2Value * 500) : 1500;
+        setArmSlider('arm1_rotate', Math.max(1000, Math.min(2000, arm1RotPwm)));
+
+        const gripOpen  = r2Held && !!armGp.buttons[armBindings.btnArm1GripperOpen]?.pressed;
+        const gripClose = r2Held && !!armGp.buttons[armBindings.btnArm1GripperClose]?.pressed;
+        arm1_gripper_state = gripOpen ? 2 : gripClose ? 1 : 0;
+
+        // L2-modified: left arm rotate (PWM scales with trigger depth) + gripper
+        const l2Value  = armGp.buttons[armBindings.btnL2Mod]?.value ?? 0;
+        const l2Held   = l2Value > 0.05;
+        const l2RotCCW = l2Held && !!armGp.buttons[armBindings.btnArm2RotateCCW]?.pressed;
+        const l2RotCW  = l2Held && !!armGp.buttons[armBindings.btnArm2RotateCW]?.pressed;
+        const arm2RotPwm = l2RotCCW ? Math.round(1500 - l2Value * 500)
+                         : l2RotCW  ? Math.round(1500 + l2Value * 500) : 1500;
+        setArmSlider('arm2_rotate', Math.max(1000, Math.min(2000, arm2RotPwm)));
+
+        const l2GripOpen  = l2Held && !!armGp.buttons[armBindings.btnArm2GripperOpen]?.pressed;
+        const l2GripClose = l2Held && !!armGp.buttons[armBindings.btnArm2GripperClose]?.pressed;
+        arm2_gripper_state = l2GripOpen ? 2 : l2GripClose ? 1 : 0;
+
+        emitArmControls();
+      }
+    }
+
     requestAnimationFrame(pollGamepad);
   }
 
   let pollRunning = false;
   let lastGpSeen  = Date.now();
   window.addEventListener('gamepadconnected', (e) => {
-    gpIndex = e.gamepad.index;
+    const id = e.gamepad.id.toLowerCase();
+    if (id.includes('dualsense') || (id.includes('054c') && id.includes('0ce6'))) {
+      gpArmIndex = e.gamepad.index;
+    } else {
+      gpIndex = e.gamepad.index;
+    }
     if (!pollRunning) { pollRunning = true; requestAnimationFrame(pollGamepad); }
   });
 
