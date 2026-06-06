@@ -5,9 +5,9 @@ const { Server } = require('socket.io');
 const dgram = require('dgram');
 const { spawn } = require('child_process');
 const fs = require('fs');
-const { MavLinkPacketSplitter, MavLinkPacketParser, common } = require('node-mavlink');
 const { SerialPort } = require('serialport');
 const { ReadlineParser } = require('@serialport/parser-readline');
+const { Worker } = require('worker_threads');
 
 const app = express();
 const server = createServer(app);
@@ -16,14 +16,6 @@ const io = new Server(server, { cors: { origin: "*" } });
 /* ================= TEENSY ================= */
 const TEENSY_IP = process.env.TEENSY_IP || '192.168.2.177';
 const TEENSY_PORT = 5000;
-const teensyUdp = dgram.createSocket('udp4');
-
-/* ================= PIXHAWK ================= */
-const PIXHAWK_PORTS = [5600];
-
-const splitter = new MavLinkPacketSplitter();
-const parser = new MavLinkPacketParser();
-const REGISTRY = { ...common.REGISTRY };
 
 /* ================= STATE ================= */
 let isArmed = true;
@@ -33,7 +25,9 @@ let latestRobotData = {
   pitch: 0,
   yaw: 0,
   depth: 0,
-  thrusters: [1500,1500,1500,1500,1500,1500]
+  thrusters: [1500,1500,1500,1500,1500,1500],
+  imuOk: false,
+  magOk: false
 };
 
 let latestJoystick = {
@@ -73,8 +67,26 @@ function saveCalibrationToFile() {
 const _cal = loadCalibration();
 let thrusterDirs     = _cal.thrusterDirs;
 let thrusterSelected = _cal.thrusterSelected;
-let pixhawkOffset    = null;
-let surfacePressure  = null; // hPa — captured on first Bar30 packet
+
+/* ================= CONTROL WORKER ================= */
+// jsState  Float32[7]: [x, y, yaw, vertical, roll, gain, verticalGain]
+// ctrlState Int32[13]: [armed, dir1..6, sel1..6]
+const jsBuffer   = new SharedArrayBuffer(7 * 4);
+const jsState    = new Float32Array(jsBuffer);
+const ctrlBuffer = new SharedArrayBuffer(13 * 4);
+const ctrlState  = new Int32Array(ctrlBuffer);
+
+jsState[5] = 0.5; // gain default
+jsState[6] = 1.0; // verticalGain default
+
+Atomics.store(ctrlState, 0, isArmed ? 1 : 0);
+for (let i = 1; i <= 6; i++) Atomics.store(ctrlState, i,     thrusterDirs[i]);
+for (let i = 1; i <= 6; i++) Atomics.store(ctrlState, 6 + i, thrusterSelected[i] ? 1 : 0);
+
+const controlWorker = new Worker(join(__dirname, 'control-worker.js'), {
+  workerData: { jsBuffer, ctrlBuffer, teensyIp: TEENSY_IP, teensyPort: TEENSY_PORT, initialArm: { ...armData } }
+});
+controlWorker.on('error', err => console.error('⚠️ Control worker error:', err));
 
 /* ================= SAFE ARDUINO SERIAL ================= */
 const ARDUINO_PORT = process.env.ARDUINO_PORT || '/dev/ttyACM1';
@@ -211,6 +223,23 @@ app.post('/api/invert', (req, res) => {
   res.json({ ok: true });
 });
 
+/* ================= RANGE PERSISTENCE ================= */
+const RANGE_FILE = join(__dirname, 'range.json');
+
+app.get('/api/range', (req, res) => {
+  try {
+    res.json(JSON.parse(fs.readFileSync(RANGE_FILE, 'utf8')));
+  } catch {
+    res.json({});
+  }
+});
+
+app.post('/api/range', (req, res) => {
+  fs.writeFileSync(RANGE_FILE, JSON.stringify(req.body, null, 2));
+  console.log('💾 Range saved');
+  res.json({ ok: true });
+});
+
 /* ================= CAM 1 MJPEG ================= */
 const camClients = new Set();
 
@@ -263,7 +292,7 @@ const GST_ARGS = [
   '!', 'rtph264depay',
   '!', 'video/x-h264,stream-format=byte-stream,alignment=au',
   '!', 'nvv4l2decoder',
-  '!', 'nvvidconv',
+  '!', 'nvvidconv', 'flip-method=2',
   '!', 'video/x-raw,format=I420',
   '!', 'jpegenc', 'quality=80',
   '!', 'multipartmux', 'boundary=frame',
@@ -470,7 +499,6 @@ process.on('SIGINT', shutdown);
 
 /* ================= MIXING ================= */
 function clamp(v,min,max){return Math.max(min,Math.min(max,v));}
-function wrapAngle(deg){return ((deg%360)+540)%360-180;}
 
 function mixThrusters(j){
   const g = clamp(j.gain||0.5,0,1);
@@ -514,67 +542,6 @@ function mixThrusters(j){
   ];
 }
 
-/* ================= TEENSY SEND ================= */
-function sendToTeensy(thrusters, arm){
-  const getGripperValues = (state) => {
-    if (state === 1) return [0, 1]; // Close
-    if (state === 2) return [1, 0]; // Open
-    return [0, 0]; // Stop
-  };
-
-  const packet = [
-    ...thrusters,
-    arm.arm1_slew,
-    arm.arm1_shoulder,
-    arm.arm1_rotate,
-    ...getGripperValues(arm.arm1_gripper),
-    arm.arm2_slew,
-    arm.arm2_shoulder,
-    arm.arm2_rotate,
-    ...getGripperValues(arm.arm2_gripper)
-  ];
-
-  const msg = Buffer.from(JSON.stringify({
-    type:"all",
-    pwms: packet,
-    ts: Date.now()
-  }));
-
-  teensyUdp.send(msg, TEENSY_PORT, TEENSY_IP);
-}
-
-/* ================= PIXHAWK ================= */
-PIXHAWK_PORTS.forEach(port=>{
-  const sock = dgram.createSocket('udp4');
-  sock.on('message', msg=>splitter.write(msg));
-  sock.bind(port,'0.0.0.0',()=>console.log('🎯 Pixhawk',port));
-});
-
-splitter.pipe(parser);
-
-parser.on('data', (packet) => {
-  const msgid = packet.header.msgid;
-  const clazz = REGISTRY[msgid];
-  if (!clazz || !packet.protocol?.data) return;
-  try {
-    const data = packet.protocol.data(packet.payload, clazz);
-    if (data.roll !== undefined) {
-      const rawPitch = Number((data.pitch * 180 / Math.PI).toFixed(1));
-      const rawYaw   = Number((data.yaw   * 180 / Math.PI).toFixed(1));
-
-      if (!pixhawkOffset) {
-        const rawRoll = Number((data.roll * 180 / Math.PI).toFixed(1));
-        pixhawkOffset = { roll: rawRoll, pitch: rawPitch, yaw: rawYaw };
-        console.log('🧭 Pixhawk offset set:', pixhawkOffset);
-      }
-
-      latestRobotData.pitch = Number((rawPitch - pixhawkOffset.pitch).toFixed(1));
-      latestRobotData.yaw   = Number(wrapAngle(rawYaw - pixhawkOffset.yaw).toFixed(1));
-      io.emit('robot-data', { ...latestRobotData, pixhawkLive: true });
-    }
-  } catch (e) {}
-});
-
 /* ================= SOCKET.IO ================= */
 io.on('connection', socket=>{
   console.log('🎮 Client connected');
@@ -584,11 +551,13 @@ io.on('connection', socket=>{
 
   socket.on('toggle-direction', (id) => {
     thrusterDirs[id] *= -1;
+    Atomics.store(ctrlState, id, thrusterDirs[id]);
     io.emit('direction-update', { id, dir: thrusterDirs[id] });
   });
 
   socket.on('toggle-selection', (id) => {
     thrusterSelected[id] = !thrusterSelected[id];
+    Atomics.store(ctrlState, 6 + id, thrusterSelected[id] ? 1 : 0);
     io.emit('selection-update', { id, selected: thrusterSelected[id] });
   });
 
@@ -600,10 +569,10 @@ io.on('connection', socket=>{
 
   socket.on('set-armed', (state) => {
     isArmed = !!state;
+    Atomics.store(ctrlState, 0, isArmed ? 1 : 0);
     if (!isArmed) {
       const neutral = [1500,1500,1500,1500,1500,1500];
       latestRobotData.thrusters = neutral;
-      sendToTeensy(neutral, armData);
       io.emit('thruster-pwm', neutral);
     }
     console.log(isArmed ? '🟢 ARMED' : '🔴 DISARMED');
@@ -613,25 +582,28 @@ io.on('connection', socket=>{
     latestJoystick = data;
     if (!isArmed) return;
 
+    // Write joystick state to shared memory — worker sends to Teensy at 100 Hz
+    jsState[0] = data.x        || 0;
+    jsState[1] = data.y        || 0;
+    jsState[2] = data.yaw      || 0;
+    jsState[3] = data.vertical || 0;
+    jsState[4] = data.roll     || 0;
+    jsState[5] = data.gain          !== undefined ? data.gain          : 0.5;
+    jsState[6] = data.verticalGain  !== undefined ? data.verticalGain  : 1.0;
+
     const thrusters = mixThrusters(data);
     latestRobotData.thrusters = thrusters;
-
-    sendToTeensy(thrusters, armData);
-
     io.emit('thruster-pwm', thrusters);
   });
 
   socket.on('arm-control', data=>{
     armData = {...data};
-
-    const thrusters = isArmed ? latestRobotData.thrusters : [1500,1500,1500,1500,1500,1500];
-    sendToTeensy(thrusters, armData);
-
+    controlWorker.postMessage({ type: 'arm', data: armData });
     io.emit('arm-update', armData);
   });
 });
 
-/* ================= TEENSY TELEMETRY [roll,pitch,yaw,depth] ================= */
+/* ================= TEENSY TELEMETRY [ISM_ROLL,ISM_PITCH,RM3100_YAW,BAR30_DEPTH,imuOk,magOk] ================= */
 const TEENSY_TELEMETRY_PORT = 5001;
 const teensyTelemetry = dgram.createSocket('udp4');
 
@@ -639,12 +611,14 @@ teensyTelemetry.on('message', (raw) => {
   try {
     const telemetry = JSON.parse(raw.toString().trim());
     if (!Array.isArray(telemetry) || telemetry.length < 4) return;
-    const [roll, pitch, yaw, depth] = telemetry;
-    if (!isNaN(roll))  latestRobotData.roll  = Number(roll.toFixed(2));
-    if (!isNaN(pitch)) latestRobotData.pitch = Number(pitch.toFixed(2));
-    if (!isNaN(yaw))   latestRobotData.yaw   = Number(yaw.toFixed(2));
-    if (!isNaN(depth)) latestRobotData.depth = Number(Math.max(0, depth).toFixed(3));
-    io.emit('robot-data', { ...latestRobotData });
+    const [ismRoll, ismPitch, ismYaw, rm3100Yaw, bar30Depth, imuOkVal, magOkVal] = telemetry;
+    if (!isNaN(ismRoll))    latestRobotData.roll  = Number(ismRoll.toFixed(2));
+    if (!isNaN(ismPitch))   latestRobotData.pitch = Number(ismPitch.toFixed(2));
+    if (!isNaN(rm3100Yaw))  latestRobotData.yaw   = Number(rm3100Yaw.toFixed(2));
+    if (!isNaN(bar30Depth)) latestRobotData.depth = Number(Math.max(0, bar30Depth).toFixed(3));
+    latestRobotData.imuOk = imuOkVal !== undefined ? !!imuOkVal : latestRobotData.imuOk;
+    latestRobotData.magOk = magOkVal !== undefined ? !!magOkVal : latestRobotData.magOk;
+    io.emit('robot-data', { ...latestRobotData, teensyLive: true });
   } catch (e) {}
 });
 
@@ -653,8 +627,6 @@ teensyTelemetry.bind(TEENSY_TELEMETRY_PORT, '0.0.0.0', () => {
 });
 
 /* ================= START ================= */
-teensyUdp.bind(0);
-
 server.listen(3000, ()=>{
   console.log('🌐 Controls → http://localhost:3000');
   console.log('🤖 Teensy:', TEENSY_IP+':'+TEENSY_PORT);
