@@ -5,8 +5,6 @@ const { Server } = require('socket.io');
 const dgram = require('dgram');
 const { spawn } = require('child_process');
 const fs = require('fs');
-const { SerialPort } = require('serialport');
-const { ReadlineParser } = require('@serialport/parser-readline');
 const { Worker } = require('worker_threads');
 
 const app = express();
@@ -19,6 +17,8 @@ const TEENSY_PORT = 5000;
 
 /* ================= STATE ================= */
 let isArmed = true;
+const relayStates = { 1: false, 2: false, 3: false, 4: false };
+let latestCamZoomState = { selectedCam: 0, camZooms: [1, 1, 1, 1, 1] };
 
 let latestRobotData = {
   roll: 0,
@@ -38,11 +38,11 @@ let armData = {
   arm1_slew: 1500,
   arm1_shoulder: 1500,
   arm1_rotate: 1500,
-  arm1_gripper: 0, // 0 for stop, 1 for close, 2 for open
+  arm1_gripper: 1500, // PWM direct: 1300=open, 1700=close, 1500=neutral
   arm2_slew: 1500,
   arm2_shoulder: 1500,
   arm2_rotate: 1500,
-  arm2_gripper: 0 // 0 for stop, 1 for close, 2 for open
+  arm2_gripper: 1500, // PWM direct: 1300=open, 1700=close, 1500=neutral
 };
 
 const CALIBRATION_FILE = join(__dirname, 'calibration.json');
@@ -88,66 +88,6 @@ const controlWorker = new Worker(join(__dirname, 'control-worker.js'), {
 });
 controlWorker.on('error', err => console.error('⚠️ Control worker error:', err));
 
-/* ================= SAFE ARDUINO SERIAL ================= */
-const ARDUINO_PORT = process.env.ARDUINO_PORT || '/dev/ttyACM1';
-const ARDUINO_BAUD = 115200;
-
-function startArduino() {
-  try {
-    const arduinoSerial = new SerialPort({
-      path: ARDUINO_PORT,
-      baudRate: ARDUINO_BAUD,
-      autoOpen: false
-    });
-
-    const parser = arduinoSerial.pipe(
-      new ReadlineParser({ delimiter: '\n' })
-    );
-
-    arduinoSerial.open((err) => {
-      if (err) {
-        console.warn(`⚠️ Arduino NOT found on ${ARDUINO_PORT}`);
-        return;
-      }
-      console.log(`✅ Arduino connected: ${ARDUINO_PORT}`);
-    });
-
-    parser.on('data', (line) => {
-      line = line.trim();
-      if (!line.startsWith('DATA:')) return;
-
-      const parts = line.slice(5).split(',');
-      if (parts.length !== 6) return;
-
-      const angles = parts.map(Number);
-      if (angles.some(isNaN)) return;
-
-      const toPwm = (deg) => {
-        const c = Math.max(0, Math.min(270, deg));
-        if (Math.abs(c - 135) < 10) return 1500;
-        return c < 135
-          ? Math.round(1100 + (c/135)*400)
-          : Math.round(1500 + ((c-135)/135)*400);
-      };
-
-      armData.arm1_shoulder = toPwm(angles[0]);
-      armData.arm1_rotate   = toPwm(angles[1]);
-      armData.arm2_shoulder = toPwm(angles[3]);
-      armData.arm2_rotate   = toPwm(angles[4]);
-
-      io.emit('arm-update', armData);
-    });
-
-    arduinoSerial.on('error', (err) => {
-      console.warn('⚠️ Arduino error:', err.message);
-    });
-
-  } catch (e) {
-    console.warn('⚠️ Arduino init failed:', e.message);
-  }
-}
-
-startArduino();
 
 /* ================= BINDINGS PERSISTENCE ================= */
 const BINDINGS_FILE = join(__dirname, 'bindings.json');
@@ -198,7 +138,7 @@ function saveInvertToFile(data) {
 let savedInvert = loadInvert();
 
 /* ================= EXPRESS ================= */
-app.use(express.json());
+app.use(express.json({ limit: '20mb' }));
 app.get('/', (req, res) => res.sendFile(join(__dirname, '../frontend', 'index.html')));
 app.use(express.static(join(__dirname, '../frontend')));
 app.get('/api/bindings', (req, res) => {
@@ -240,21 +180,32 @@ app.post('/api/range', (req, res) => {
   res.json({ ok: true });
 });
 
-/* ================= CAM 1 MJPEG ================= */
-const camClients = new Set();
+/* ================= CAPTURE KEY PERSISTENCE ================= */
+const CAPTURE_SETTINGS_FILE = join(__dirname, 'capture-settings.json');
 
-app.get('/cam1', (req, res) => {
-  res.setHeader('Content-Type', 'multipart/x-mixed-replace; boundary=frame');
-  res.setHeader('Cache-Control', 'no-cache');
-  camClients.add(res);
-  req.on('close', () => camClients.delete(res));
+app.get('/api/capture-key', (req, res) => {
+  try {
+    res.json(JSON.parse(fs.readFileSync(CAPTURE_SETTINGS_FILE, 'utf8')));
+  } catch {
+    res.json({ key: 'F9' });
+  }
 });
 
+app.post('/api/capture-key', (req, res) => {
+  const { key } = req.body;
+  fs.writeFileSync(CAPTURE_SETTINGS_FILE, JSON.stringify({ key }, null, 2));
+  console.log(`💾 Capture key saved: ${key}`);
+  res.json({ ok: true });
+});
+
+
+/* ================= CAM MJPEG ================= */
 const camClients2 = new Set();
 
 app.get('/cam2', (req, res) => {
   res.setHeader('Content-Type', 'multipart/x-mixed-replace; boundary=frame');
   res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Access-Control-Allow-Origin', '*');
   camClients2.add(res);
   req.on('close', () => camClients2.delete(res));
 });
@@ -264,6 +215,7 @@ const camClients3 = new Set();
 app.get('/cam3', (req, res) => {
   res.setHeader('Content-Type', 'multipart/x-mixed-replace; boundary=frame');
   res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Access-Control-Allow-Origin', '*');
   camClients3.add(res);
   req.on('close', () => camClients3.delete(res));
 });
@@ -273,6 +225,7 @@ const camClients4 = new Set();
 app.get('/cam4', (req, res) => {
   res.setHeader('Content-Type', 'multipart/x-mixed-replace; boundary=frame');
   res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Access-Control-Allow-Origin', '*');
   camClients4.add(res);
   req.on('close', () => camClients4.delete(res));
 });
@@ -282,216 +235,107 @@ const camClients5 = new Set();
 app.get('/cam5', (req, res) => {
   res.setHeader('Content-Type', 'multipart/x-mixed-replace; boundary=frame');
   res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Access-Control-Allow-Origin', '*');
   camClients5.add(res);
   req.on('close', () => camClients5.delete(res));
 });
 
-const RTSP_URL1 = 'rtsp://192.168.2.2:8554/video_udp_stream_0';
-const GST_ARGS = [
-  'rtspsrc', `location=${RTSP_URL1}`, 'latency=0', 'protocols=tcp',
-  '!', 'rtph264depay',
-  '!', 'video/x-h264,stream-format=byte-stream,alignment=au',
-  '!', 'nvv4l2decoder',
-  '!', 'nvvidconv', 'flip-method=2',
-  '!', 'video/x-raw,format=I420',
-  '!', 'jpegenc', 'quality=80',
-  '!', 'multipartmux', 'boundary=frame',
-  '!', 'fdsink', 'fd=1'
-];
+/* ================= RTSP camera manager ================= */
+// Two-phase watchdog:
+//   CONNECT_MS — time allowed for GStreamer to establish RTSP and produce first frame.
+//                Must be generous; killing too early causes an infinite restart loop.
+//   STREAM_MS  — max gap between frames once streaming. Shorter so hangs recover fast.
+const CONNECT_MS = 35000;
+const STREAM_MS  = 12000;
 
-let gstProc = null;
+function createRtspCam(label, url, clients, camNum) {
+  const args = [
+    'rtspsrc', `location=${url}`, 'latency=0', 'protocols=tcp',
+    '!', 'rtph265depay',
+    '!', 'nvv4l2decoder',
+    '!', 'nvvidconv',
+    '!', 'video/x-raw,format=I420',
+    '!', 'jpegenc', 'quality=80',
+    '!', 'multipartmux', 'boundary=frame',
+    '!', 'fdsink', 'fd=1',
+  ];
 
-function startGStreamer() {
-  gstProc = spawn('gst-launch-1.0', GST_ARGS);
-  gstProc.on('error', (err) => {
-    if (err.code === 'ENOENT') {
-      console.warn('⚠️ GStreamer not found — camera feed disabled');
-    } else {
-      console.warn('⚠️ GStreamer error:', err.message, '— restarting in 3s');
-      setTimeout(startGStreamer, 3000);
-    }
-    gstProc = null;
-  });
-  gstProc.stdout.on('data', chunk => {
-    for (const res of camClients) res.write(chunk);
-  });
-  gstProc.stderr.on('data', d => console.log('🎥 GStreamer:', d.toString().trim()));
-  gstProc.on('exit', (code, signal) => {
-    if (!gstProc) return; // already handled by error event
-    console.log('🎥 GStreamer exited:', code, '— restarting in 3s');
-    gstProc = null;
-    setTimeout(startGStreamer, 3000);
-  });
+  let proc           = null;
+  let watchdog       = null;
+  let pendingRestart = false;
+  let streaming      = false; // true once first frame received
+
+  function setWatchdog(ms) {
+    if (watchdog) clearTimeout(watchdog);
+    watchdog = setTimeout(() => {
+      const phase = streaming ? 'stream timeout' : 'connection timeout';
+      console.warn(`⚠️ ${label} ${phase} — restarting`);
+      if (proc) { proc.kill('SIGKILL'); proc = null; }
+      // 2 s delay lets the camera release the RTSP session before we reconnect
+      scheduleRestart(2000);
+    }, ms);
+  }
+
+  function scheduleRestart(delay = 5000) {
+    if (pendingRestart) return;
+    pendingRestart = true;
+    // Only notify the browser if the stream was live — startup retries should be invisible
+    if (streaming) io.emit('cam-restart', { cam: camNum });
+    setTimeout(() => { pendingRestart = false; start(); }, delay);
+  }
+
+  function start() {
+    if (proc) return;
+    streaming = false;
+    proc = spawn('gst-launch-1.0', args);
+    setWatchdog(CONNECT_MS); // generous timeout for initial RTSP handshake
+
+    proc.on('error', err => {
+      if (watchdog) { clearTimeout(watchdog); watchdog = null; }
+      proc = null;
+      if (err.code === 'ENOENT') { console.warn(`⚠️ GStreamer not found — ${label} disabled`); return; }
+      scheduleRestart();
+    });
+
+    proc.stdout.on('data', chunk => {
+      if (!streaming) {
+        streaming = true;
+        console.log(`✓ ${label} streaming`);
+      }
+      setWatchdog(STREAM_MS); // tighter watchdog now that stream is live
+      for (const res of clients) {
+        try { res.write(chunk); } catch { clients.delete(res); }
+      }
+    });
+
+    proc.stderr.on('data', () => {});
+
+    proc.on('exit', () => {
+      if (watchdog) { clearTimeout(watchdog); watchdog = null; }
+      if (!proc) return; // already handled by watchdog
+      proc = null;
+      console.warn(`⚠️ ${label} exited — retrying in 5s`);
+      scheduleRestart();
+    });
+  }
+
+  function stop() {
+    if (watchdog) { clearTimeout(watchdog); watchdog = null; }
+    if (proc) { proc.kill(); proc = null; }
+  }
+
+  return { start, stop };
 }
 
-startGStreamer();
+const cam2 = createRtspCam('Cam2', 'rtsp://admin:admin@192.168.2.12:554/live/0/SUB',    camClients2, 2);
+const cam3 = createRtspCam('Cam3', 'rtsp://admin:Admin123@192.168.2.13:554/live/0/SUB', camClients3, 3);
+const cam4 = createRtspCam('Cam4', 'rtsp://admin:Admin123@192.168.2.14:554/live/0/SUB', camClients4, 4);
+const cam5 = createRtspCam('Cam5', 'rtsp://admin:Admin123@192.168.2.15:554/live/0/SUB', camClients5, 5);
 
-/* ================= CAM 2 — RTSP ================= */
-const RTSP_URL = 'rtsp://admin:admin@192.168.2.12:554/live/0/SUB';
-const GST_RTSP_ARGS = [
-  'rtspsrc', `location=${RTSP_URL}`, 'latency=0', 'protocols=tcp',
-  '!', 'rtph265depay',
-  '!', 'nvv4l2decoder',
-  '!', 'nvvidconv',
-  '!', 'video/x-raw,format=I420',
-  '!', 'jpegenc', 'quality=80',
-  '!', 'multipartmux', 'boundary=frame',
-  '!', 'fdsink', 'fd=1'
-];
-
-let gstProc2 = null;
-
-function startRtspCamera() {
-  gstProc2 = spawn('gst-launch-1.0', GST_RTSP_ARGS);
-  gstProc2.on('error', (err) => {
-    if (err.code === 'ENOENT') {
-      console.warn('⚠️ GStreamer not found — RTSP cam disabled');
-    } else {
-      console.warn('⚠️ RTSP cam error:', err.message, '— restarting in 5s');
-      setTimeout(startRtspCamera, 5000);
-    }
-    gstProc2 = null;
-  });
-  gstProc2.stdout.on('data', chunk => {
-    for (const res of camClients2) res.write(chunk);
-  });
-  gstProc2.stderr.on('data', d => console.log('📷 RTSP cam:', d.toString().trim()));
-  gstProc2.on('exit', (code, signal) => {
-    if (!gstProc2) return;
-    console.log('📷 RTSP cam exited:', code, '— restarting in 5s');
-    gstProc2 = null;
-    setTimeout(startRtspCamera, 5000);
-  });
-}
-
-startRtspCamera();
-
-/* ================= CAM 3 — RTSP ================= */
-const RTSP_URL3 = 'rtsp://admin:Admin123@192.168.2.13:554/live/0/SUB';
-const GST_RTSP_ARGS3 = [
-  'rtspsrc', `location=${RTSP_URL3}`, 'latency=0', 'protocols=tcp',
-  '!', 'rtph265depay',
-  '!', 'nvv4l2decoder',
-  '!', 'nvvidconv',
-  '!', 'video/x-raw,format=I420',
-  '!', 'jpegenc', 'quality=80',
-  '!', 'multipartmux', 'boundary=frame',
-  '!', 'fdsink', 'fd=1'
-];
-
-let gstProc3 = null;
-
-function startRtspCamera3() {
-  gstProc3 = spawn('gst-launch-1.0', GST_RTSP_ARGS3);
-  gstProc3.on('error', (err) => {
-    if (err.code === 'ENOENT') {
-      console.warn('⚠️ GStreamer not found — cam3 disabled');
-    } else {
-      console.warn('⚠️ Cam3 error:', err.message, '— restarting in 5s');
-      setTimeout(startRtspCamera3, 5000);
-    }
-    gstProc3 = null;
-  });
-  gstProc3.stdout.on('data', chunk => {
-    for (const res of camClients3) res.write(chunk);
-  });
-  gstProc3.stderr.on('data', d => console.log('📷 Cam3:', d.toString().trim()));
-  gstProc3.on('exit', (code, signal) => {
-    if (!gstProc3) return;
-    console.log('📷 Cam3 exited:', code, '— restarting in 5s');
-    gstProc3 = null;
-    setTimeout(startRtspCamera3, 5000);
-  });
-}
-
-startRtspCamera3();
-
-/* ================= CAM 4 — RTSP ================= */
-const RTSP_URL4 = 'rtsp://admin:Admin123@192.168.2.14:554/live/0/SUB';
-const GST_RTSP_ARGS4 = [
-  'rtspsrc', `location=${RTSP_URL4}`, 'latency=0', 'protocols=tcp',
-  '!', 'rtph265depay',
-  '!', 'nvv4l2decoder',
-  '!', 'nvvidconv',
-  '!', 'video/x-raw,format=I420',
-  '!', 'jpegenc', 'quality=80',
-  '!', 'multipartmux', 'boundary=frame',
-  '!', 'fdsink', 'fd=1'
-];
-
-let gstProc4 = null;
-
-function startRtspCamera4() {
-  gstProc4 = spawn('gst-launch-1.0', GST_RTSP_ARGS4);
-  gstProc4.on('error', (err) => {
-    if (err.code === 'ENOENT') {
-      console.warn('⚠️ GStreamer not found — cam4 disabled');
-    } else {
-      console.warn('⚠️ Cam4 error:', err.message, '— restarting in 5s');
-      setTimeout(startRtspCamera4, 5000);
-    }
-    gstProc4 = null;
-  });
-  gstProc4.stdout.on('data', chunk => {
-    for (const res of camClients4) res.write(chunk);
-  });
-  gstProc4.stderr.on('data', d => console.log('📷 Cam4:', d.toString().trim()));
-  gstProc4.on('exit', (code, signal) => {
-    if (!gstProc4) return;
-    console.log('📷 Cam4 exited:', code, '— restarting in 5s');
-    gstProc4 = null;
-    setTimeout(startRtspCamera4, 5000);
-  });
-}
-
-startRtspCamera4();
-
-/* ================= CAM 5 — RTSP ================= */
-const RTSP_URL5 = 'rtsp://admin:Admin123@192.168.2.15:554/live/0/SUB';
-const GST_RTSP_ARGS5 = [
-  'rtspsrc', `location=${RTSP_URL5}`, 'latency=0', 'protocols=tcp',
-  '!', 'rtph265depay',
-  '!', 'nvv4l2decoder',
-  '!', 'nvvidconv',
-  '!', 'video/x-raw,format=I420',
-  '!', 'jpegenc', 'quality=80',
-  '!', 'multipartmux', 'boundary=frame',
-  '!', 'fdsink', 'fd=1'
-];
-
-let gstProc5 = null;
-
-function startRtspCamera5() {
-  gstProc5 = spawn('gst-launch-1.0', GST_RTSP_ARGS5);
-  gstProc5.on('error', (err) => {
-    if (err.code === 'ENOENT') {
-      console.warn('⚠️ GStreamer not found — cam5 disabled');
-    } else {
-      console.warn('⚠️ Cam5 error:', err.message, '— restarting in 5s');
-      setTimeout(startRtspCamera5, 5000);
-    }
-    gstProc5 = null;
-  });
-  gstProc5.stdout.on('data', chunk => {
-    for (const res of camClients5) res.write(chunk);
-  });
-  gstProc5.stderr.on('data', d => console.log('📷 Cam5:', d.toString().trim()));
-  gstProc5.on('exit', (code, signal) => {
-    if (!gstProc5) return;
-    console.log('📷 Cam5 exited:', code, '— restarting in 5s');
-    gstProc5 = null;
-    setTimeout(startRtspCamera5, 5000);
-  });
-}
-
-startRtspCamera5();
+cam2.start(); cam3.start(); cam4.start(); cam5.start();
 
 function shutdown() {
-  if (gstProc)  { gstProc.kill();  gstProc  = null; }
-  if (gstProc2) { gstProc2.kill(); gstProc2 = null; }
-  if (gstProc3) { gstProc3.kill(); gstProc3 = null; }
-  if (gstProc4) { gstProc4.kill(); gstProc4 = null; }
-  if (gstProc5) { gstProc5.kill(); gstProc5 = null; }
+  cam2.stop(); cam3.stop(); cam4.stop(); cam5.stop();
   process.exit(0);
 }
 process.on('SIGTERM', shutdown);
@@ -542,12 +386,58 @@ function mixThrusters(j){
   ];
 }
 
+/* ================= DATASET CAPTURE ================= */
+let captureProc   = null;
+let captureCount  = 0;
+let captureActive = false;
+
+function startCapture() {
+  if (captureActive) return;
+  captureActive = true;
+  captureCount  = 0;
+  const script = join(__dirname, '../scripts/capture_dataset_metashape.py');
+  captureProc = spawn('python3', ['-u', script]);
+  captureProc.stdout.on('data', (data) => {
+    for (const line of data.toString().trim().split('\n')) {
+      if (line.startsWith('DONE:')) {
+        captureCount  = parseInt(line.split(':')[1]) || captureCount;
+        captureActive = false;
+        captureProc   = null;
+        io.emit('capture-status', { active: false, count: captureCount });
+      } else {
+        const n = parseInt(line);
+        if (!isNaN(n)) {
+          captureCount = n;
+          io.emit('capture-status', { active: true, count: captureCount });
+        }
+      }
+    }
+  });
+  captureProc.on('exit', () => {
+    captureActive = false;
+    captureProc   = null;
+    io.emit('capture-status', { active: false, count: captureCount });
+  });
+  io.emit('capture-status', { active: true, count: 0 });
+  console.log('📸 Dataset capture started');
+}
+
+function stopCapture() {
+  if (captureProc) { captureProc.kill('SIGTERM'); captureProc = null; }
+  captureActive = false;
+  io.emit('capture-status', { active: false, count: captureCount });
+  console.log(`📸 Dataset capture stopped — ${captureCount} frames`);
+}
+
 /* ================= SOCKET.IO ================= */
 io.on('connection', socket=>{
   console.log('🎮 Client connected');
 
   socket.emit('robot-data', latestRobotData);
   socket.emit('calibration-state', { dirs: thrusterDirs, selected: thrusterSelected });
+  socket.emit('cam-zoom-state', latestCamZoomState);
+  socket.emit('capture-status', { active: captureActive, count: captureCount });
+  socket.emit('relay-states', relayStates);
 
   socket.on('toggle-direction', (id) => {
     thrusterDirs[id] *= -1;
@@ -578,6 +468,16 @@ io.on('connection', socket=>{
     console.log(isArmed ? '🟢 ARMED' : '🔴 DISARMED');
   });
 
+  socket.on('set-relay', ({ index, state }) => {
+    relayStates[index] = !!state;
+    controlWorker.postMessage({
+      type: 'relay',
+      relays: [1,2,3,4].map(i => relayStates[i] ? 1 : 0),
+    });
+    io.emit('relay-state', { index, state: !!state });
+    console.log(`💡 Relay ${index} ${state ? 'ON' : 'OFF'}`);
+  });
+
   socket.on('joystick-input', data=>{
     latestJoystick = data;
     if (!isArmed) return;
@@ -601,6 +501,65 @@ io.on('connection', socket=>{
     controlWorker.postMessage({ type: 'arm', data: armData });
     io.emit('arm-update', armData);
   });
+
+  socket.on('cam-zoom-state', (data) => {
+    latestCamZoomState = data;
+    socket.broadcast.emit('cam-zoom-state', data);
+  });
+
+  socket.on('promote-cam', (data) => {
+    socket.broadcast.emit('promote-cam', data);
+  });
+
+  socket.on('toggle-capture', () => {
+    if (!captureActive) startCapture();
+    else stopCapture();
+  });
+});
+
+/* ================= CRAB DETECTION ================= */
+const CAPTURE_PATH = join(__dirname, 'capture.png');
+const INFER_OUT    = join(__dirname, 'infer_out.png');
+const INFER_SCRIPT = join(__dirname, '../scripts/infer_crabs.py');
+
+const CRAB_CORS = (res) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+};
+
+app.options('/api/capture-frame', (req, res) => { CRAB_CORS(res); res.sendStatus(204); });
+app.options('/api/infer-crabs',   (req, res) => { CRAB_CORS(res); res.sendStatus(204); });
+
+app.post('/api/capture-frame', (req, res) => {
+  CRAB_CORS(res);
+  const { image } = req.body;
+  if (!image) return res.status(400).json({ ok: false, error: 'no image' });
+  const base64 = image.replace(/^data:image\/\w+;base64,/, '');
+  fs.writeFileSync(CAPTURE_PATH, Buffer.from(base64, 'base64'));
+  res.json({ ok: true });
+});
+
+app.post('/api/infer-crabs', (req, res) => {
+  CRAB_CORS(res);
+  if (!fs.existsSync(CAPTURE_PATH)) return res.status(404).json({ error: 'no captured frame — press B first' });
+  const proc = spawn('python3', [INFER_SCRIPT, CAPTURE_PATH, INFER_OUT]);
+  let stdout = '', stderr = '';
+  proc.stdout.on('data', d => { stdout += d; });
+  proc.stderr.on('data', d => { stderr += d; });
+  proc.on('close', code => {
+    if (code !== 0) {
+      console.error('infer_crabs error:', stderr.trim());
+      return res.status(500).json({ error: stderr.slice(-200) || 'inference failed' });
+    }
+    try {
+      const result = JSON.parse(stdout.trim());
+      result.image = 'data:image/png;base64,' + fs.readFileSync(INFER_OUT).toString('base64');
+      res.json(result);
+    } catch (e) {
+      res.status(500).json({ error: 'parse error: ' + stdout.slice(0, 100) });
+    }
+  });
 });
 
 /* ================= TEENSY TELEMETRY [ISM_ROLL,ISM_PITCH,RM3100_YAW,BAR30_DEPTH,imuOk,magOk] ================= */
@@ -614,7 +573,7 @@ teensyTelemetry.on('message', (raw) => {
     const [ismRoll, ismPitch, ismYaw, rm3100Yaw, bar30Depth, imuOkVal, magOkVal] = telemetry;
     if (!isNaN(ismRoll))    latestRobotData.roll  = Number(ismRoll.toFixed(2));
     if (!isNaN(ismPitch))   latestRobotData.pitch = Number(ismPitch.toFixed(2));
-    if (!isNaN(rm3100Yaw))  latestRobotData.yaw   = Number(rm3100Yaw.toFixed(2));
+    if (!isNaN(ismYaw))  latestRobotData.yaw   = Number(ismYaw.toFixed(2));
     if (!isNaN(bar30Depth)) latestRobotData.depth = Number(Math.max(0, bar30Depth).toFixed(3));
     latestRobotData.imuOk = imuOkVal !== undefined ? !!imuOkVal : latestRobotData.imuOk;
     latestRobotData.magOk = magOkVal !== undefined ? !!magOkVal : latestRobotData.magOk;

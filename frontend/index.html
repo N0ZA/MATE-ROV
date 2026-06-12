@@ -18,11 +18,16 @@
     html, body { margin: 0; padding: 0; height: 100%; background: var(--bg2); color: #f8fafc; font-family: 'Segoe UI', sans-serif; }
     body { overflow: hidden; }
     * { box-sizing: border-box; }
-    .main-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; height: 100vh; padding: 10px; min-width: 0; }
+    .main-layout { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; height: 100vh; padding: 10px; min-width: 0; }
     .card { background: var(--bg1); padding: 10px; border-radius: 8px; border: 1px solid var(--p); }
     .column { display: flex; flex-direction: column; gap: 10px; height: 100%; min-height: 0; }
     .left-column { overflow-y: auto; padding-right: 4px; min-height: 0; }
     .right-column { overflow-y: auto; padding-left: 4px; min-height: 0; }
+    .cam-strip { overflow: hidden; padding-left: 4px; min-height: 0; display: flex; flex-direction: column; gap: 4px; }
+    .cam-strip-title { flex-shrink: 0; font-size: 10px; font-weight: bold; letter-spacing: 1px; color: var(--s1); text-transform: uppercase; text-align: center; padding: 4px 0 2px; border-bottom: 1px solid var(--p); margin-bottom: 2px; }
+    .cam-slot { flex: 1; min-height: 0; overflow: hidden; display: flex; flex-direction: column; align-items: center; }
+    .cam-slot img { width: 100%; aspect-ratio: 16 / 9; object-fit: contain; border-radius: 4px; border: 1px solid var(--p); background: #000; display: block; }
+.cam-label { flex-shrink: 0; font-size: 9px; color: var(--s1); text-align: center; }
 
     .dual-gimbals { display: flex; justify-content: space-between; gap: 10px; padding: 10px 0; }
     .gimbal-wrap { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 5px; }
@@ -82,10 +87,11 @@
     h3 { font-size: 13px; margin: 0 0 8px 0; color: var(--s); text-transform: uppercase; letter-spacing: 1px; border-bottom: 1px solid var(--p); padding-bottom: 4px; }
     .label { font-size: 12px; color: var(--s1); text-transform: uppercase; }
     .val-num { font-family: monospace; font-size: 20px; color: var(--s); font-weight: bold; }
-    #conn { font-weight: bold; margin-left: 6px; }
+
     .dir-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 5px; margin-top: 5px; }
     .dir-btn { padding: 4px; font-size: 12px; cursor: pointer; border: 1px solid var(--p); border-radius: 3px; background: var(--p); color: white; }
     .sel-btn { padding: 4px; font-size: 12px; cursor: pointer; border: 1px solid var(--p); border-radius: 3px; background: var(--p); color: white; font-weight: bold; }
+    .sel-btn.active { background: #ca8a04; border-color: #fbbf24; color: #fff; box-shadow: 0 0 8px #fbbf2444; }
     .arm-state-btn { flex: 1; padding: 8px; font-size: 14px; font-weight: bold; cursor: pointer; border-radius: 4px; border: 2px solid var(--p1); background: var(--p); color: var(--s1); }
     #btn-arm.active    { background: #16a34a; border-color: #22c55e; color: #fff; box-shadow: 0 0 8px #22c55e44; }
     #btn-disarm.active { background: #b91c1c; border-color: #ef4444; color: #fff; box-shadow: 0 0 8px #ef444444; }
@@ -104,6 +110,7 @@
     .gripper-controls button.active { background: var(--s); border-color: var(--s); box-shadow: 0 0 8px var(--s); }
     .rotate-pwm-btn { background: var(--p); border: 1px solid var(--p1); color: #facc15; padding: 3px 5px; border-radius: 4px; cursor: pointer; font-size: 11px; font-weight: bold; flex-shrink: 0; }
     .rotate-pwm-btn:active { background: #f97316; border-color: #f97316; }
+    .rotate-pwm-btn.active { background: var(--s); border-color: var(--s); color: #000; box-shadow: 0 0 8px var(--s); }
 
     /* ====== CAMERA BANNER (shown if popup blocked) ====== */
     #cam-banner { display:none; position:fixed; top:0; left:0; right:0; z-index:300; background:#1e1240; border-bottom:2px solid #7c3aed; padding:8px 16px; text-align:center; font-size:13px; color:#c4b5fd; }
@@ -142,6 +149,12 @@
     .toggle-btn.reversed { background: #ef4444; border-color: #ef4444; color: #fff; box-shadow: 0 0 8px rgba(239,68,68,0.4); }
     .toggle-btn.normal { background: #22c55e; border-color: #22c55e; color: #000; box-shadow: 0 0 8px rgba(34,197,94,0.3); }
 
+    /* Range config */
+    .range-row   { display:flex; align-items:center; gap:8px; padding:7px 0; border-bottom:1px solid var(--bg2); }
+    .range-label { flex:1; font-size:13px; color:var(--s1); }
+    .range-input { width:68px; background:var(--bg2); border:1px solid var(--p1); color:#facc15; border-radius:4px; padding:3px 6px; font-size:13px; text-align:center; }
+    .range-sep   { font-size:11px; color:var(--p1); }
+
     /* Bindings */
     .binding-section { font-size: 12px; color: var(--p1); text-transform: uppercase; letter-spacing: 1px; margin: 12px 0 4px 0; }
     .binding-row { display: flex; align-items: center; gap: 10px; padding: 7px 0; border-bottom: 1px solid var(--bg2); }
@@ -152,6 +165,8 @@
     .remap-btn { background: var(--p); border: 1px solid var(--p1); color: #f8fafc; padding: 3px 10px; border-radius: 4px; cursor: pointer; font-size: 12px; white-space: nowrap; }
     .remap-btn:hover { border-color: var(--s); }
     .remap-btn.active { background: #f97316; border-color: #f97316; }
+    .reset-bind-btn { background: transparent; border: 1px solid #555; color: #aaa; padding: 3px 7px; border-radius: 4px; cursor: pointer; font-size: 12px; line-height: 1; }
+    .reset-bind-btn:hover { border-color: #ef4444; color: #ef4444; }
 
     .modal-footer { display: flex; gap: 10px; padding: 14px 20px; border-top: 1px solid var(--p); justify-content: flex-end; background: var(--bg1); }
     .modal-footer button { padding: 6px 16px; border-radius: 5px; border: 1px solid var(--p); background: var(--bg2); color: #f8fafc; cursor: pointer; font-size: 13px; }
@@ -191,7 +206,12 @@
             <div class="label">Yaw</div>
             <div class="value" id="valYawGain" style="color:#c4b5fd;">65%</div>
           </div>
-          <div class="value-box" style="border-color:#22c55e;grid-column:span 2;">
+          <div class="value-box" id="gainBoxDiagonal" style="border-color:#a78bfa;">
+            <div class="label">Diagonal</div>
+            <div class="value" id="valDiagGain" style="color:#a78bfa;">65%</div>
+          </div>
+
+          <div class="value-box" style="border-color:#22c55e;">
             <div class="label">Roll</div>
             <div class="value" id="valRollGain" style="color:#22c55e;">50%</div>
           </div>
@@ -213,6 +233,7 @@
 
       <div class="card">
         <h3>ARM CONTROLS</h3>
+        <div id="armModeTag" style="text-align:center;padding:4px 8px;margin-bottom:8px;border-radius:4px;font-size:10px;font-weight:bold;letter-spacing:1px;border:1px solid #c4b5fd;color:#c4b5fd;background:rgba(196,181,253,0.1);">NORMAL MODE</div>
         <div class="arm-container">
           <div class="arm-section">
             <span class="arm-section-title">Right Arm</span>
@@ -235,10 +256,10 @@
             </div>
             <div class="arm-slider-row">
               <div class="arm-slider-label">Gripper</div>
-              <div class="gripper-controls">
-                <button id="arm1_gripper_close">Close</button>
-                <button id="arm1_gripper_open">Open</button>
-              </div>
+              <button class="rotate-pwm-btn" id="arm1_gripper_open">OPEN</button>
+              <button class="rotate-pwm-btn" id="arm1_gripper_close">CLOSE</button>
+              <div class="arm-slider-value" id="arm1_gripper_val">1500</div>
+              <input type="hidden" id="arm1_gripper" value="1500">
             </div>
           </div>
 
@@ -263,10 +284,10 @@
             </div>
             <div class="arm-slider-row">
               <div class="arm-slider-label">Gripper</div>
-              <div class="gripper-controls">
-                <button id="arm2_gripper_close">Close</button>
-                <button id="arm2_gripper_open">Open</button>
-              </div>
+              <button class="rotate-pwm-btn" id="arm2_gripper_open">OPEN</button>
+              <button class="rotate-pwm-btn" id="arm2_gripper_close">CLOSE</button>
+              <div class="arm-slider-value" id="arm2_gripper_val">1500</div>
+              <input type="hidden" id="arm2_gripper" value="1500">
             </div>
           </div>
         </div>
@@ -277,36 +298,32 @@
     <div class="column right-column">
       <div class="card">
         <h3>ORIENTATION</h3>
-        <div class="label" style="text-align:center;">STATUS <span id="conn">DISCONNECTED</span></div>
+
         <button onclick="resetOrientation()" style="margin:6px auto 0; display:block; background:transparent; border:1px solid var(--p1); color:var(--s1); border-radius:4px; padding:3px 10px; font-size:10px; font-weight:bold; letter-spacing:1px; cursor:pointer; transition:border-color 0.15s,color 0.15s; text-transform:uppercase;" onmouseover="this.style.borderColor='var(--s)';this.style.color='var(--s)'" onmouseout="this.style.borderColor='var(--p1)';this.style.color='var(--s1)'">↺ RESET</button>
 
-        <!-- Gauges side by side -->
-        <div style="display:flex; justify-content:center; gap:12px; margin-top:6px;">
+        <!-- All four displays in one row -->
+        <div style="display:flex; justify-content:center; gap:12px; margin-top:6px; align-items:flex-start;">
           <div style="text-align:center;">
-            <div class="label">YAW</div>
+            <div class="label">RM3100_YAW</div>
             <div class="compass"><div class="yaw-needle" id="yaw-needle"></div></div>
             <div style="font-size:11px; margin-top:3px;"><span id="yv">0.0</span>°</div>
           </div>
           <div style="text-align:center;">
-            <div class="label">PITCH & ROLL</div>
+            <div class="label">ISM_PITCH & ISM_ROLL</div>
             <div class="compass" style="border-color:#22c55e;">
               <div class="horizon-wrap"><div class="horizon-line" id="pr-line"></div></div>
             </div>
             <div style="font-size:11px; margin-top:3px;">P: <span id="pv">0</span>° | R: <span id="rv">0</span>°</div>
           </div>
-        </div>
-
-        <!-- Flight control + depth sensor -->
-        <div style="display:flex; gap:12px; margin-top:12px; align-items:flex-start;">
-          <div style="flex:1; display:flex; flex-direction:column; align-items:center; gap:4px;">
+          <div style="text-align:center;">
             <div class="label">FLIGHT CONTROL</div>
             <div class="gimbal-label">Sway / Surge</div>
             <div class="trackpad" id="trackpad" style="width:90px; height:90px;">
               <div class="joystick-dot" id="leftStick"></div>
             </div>
           </div>
-          <div style="flex:1; display:flex; flex-direction:column; justify-content:center; gap:2px; padding-top:16px;">
-            <div class="label">Depth</div>
+          <div style="text-align:center; padding-top:16px;">
+            <div class="label">BAR30_DEPTH</div>
             <div class="val-num" id="depth">0.00 m</div>
             <div class="label" id="depthTargetLabel" style="display:none; margin-top:6px;">Target</div>
             <div class="val-num" id="depthTargetDisplay" style="display:none; color:#f59e0b;">0.00 m</div>
@@ -328,7 +345,7 @@
           <div style="display:flex; flex-direction:column; gap:5px; margin-top:5px;">
             <button class="sel-btn" id="hbtn-depth"     onclick="setHoldMode('depth')">DEPTH HOLD</button>
             <button class="sel-btn" id="hbtn-roll"      onclick="setHoldMode('roll')">ROLL HOLD</button>
-            <button class="sel-btn" id="hbtn-stabilize" onclick="setHoldMode('stabilize')">STABILIZE</button>
+            <button class="sel-btn" id="hbtn-yaw" onclick="setHoldMode('yaw')">YAW HOLD</button>
           </div>
         </div>
         <h3>LIVE THRUSTER MAP</h3>
@@ -352,10 +369,29 @@
       </div>
 
       <div class="card">
+        <h3>LIGHTS</h3>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px; margin-top:6px;">
+          <button class="sel-btn" id="light-btn-1" onclick="toggleLight(1)">LIGHT 1</button>
+          <button class="sel-btn" id="light-btn-2" onclick="toggleLight(2)">LIGHT 2</button>
+          <button class="sel-btn" id="light-btn-3" onclick="toggleLight(3)">LIGHT 3</button>
+          <button class="sel-btn" id="light-btn-4" onclick="toggleLight(4)">LIGHT 4</button>
+        </div>
+      </div>
+
+      <div class="card">
         <h3>SENSORS</h3>
         <div class="label">Network</div>
         <div style="color:#22c55e; font-weight:bold;"><span id="ping">0</span> ms</div>
       </div>
+    </div>
+
+    <!-- Camera strip -->
+    <div class="column cam-strip">
+      <div class="cam-strip-title">CAMERAS</div>
+      <div class="cam-slot"><img id="cs-cam2" src="" alt="CAM 2" /><div class="cam-label">CAM 2</div></div>
+      <div class="cam-slot"><img id="cs-cam3" src="" alt="CAM 3" /><div class="cam-label">CAM 3</div></div>
+      <div class="cam-slot"><img id="cs-cam4" src="" alt="CAM 4" /><div class="cam-label">CAM 4</div></div>
+      <div class="cam-slot"><img id="cs-cam5" src="" alt="CAM 5" /><div class="cam-label">CAM 5</div></div>
     </div>
   </div>
 
@@ -379,6 +415,8 @@
         <button class="modal-tab" onclick="switchTab('tab-calib')">🔧 Calibration</button>
         <button class="modal-tab" onclick="switchTab('tab-dof')">🎯 DOF Mode</button>
         <button class="modal-tab" onclick="switchTab('tab-theme')">🎨 Theme</button>
+        <button class="modal-tab" onclick="switchTab('tab-range')">🎛 Range</button>
+        <button class="modal-tab" onclick="switchTab('tab-controllers');refreshGamepadList()">🕹 Controllers</button>
       </div>
 
       <div class="modal-body">
@@ -437,6 +475,11 @@
             <div class="invert-desc">Reverse roll leveling direction</div>
             <button class="toggle-btn normal" id="inv-rollHoldDir" onclick="toggleInvert('rollHoldDir')">NORMAL</button>
           </div>
+          <div class="invert-row">
+            <div class="invert-label">Yaw Hold</div>
+            <div class="invert-desc">Reverse yaw hold correction direction</div>
+            <button class="toggle-btn normal" id="inv-yawHoldDir" onclick="toggleInvert('yawHoldDir')">NORMAL</button>
+          </div>
 
           <div class="invert-section-title">Arm 1</div>
 
@@ -487,8 +530,15 @@
 
         <!-- ===== TAB: BINDINGS ===== -->
         <div class="tab-panel" id="tab-bindings">
-          <p class="modal-hint">Click REMAP, then move the axis or press the button on your controller to assign it.</p>
+          <p class="modal-hint">Click REMAP, then move the axis or press a button on your controller — or press any keyboard key to bind it instead.</p>
           <div id="bindingsList"></div>
+
+          <div class="invert-section-title" style="margin-top:18px;">Dataset Capture</div>
+          <div class="invert-row">
+            <div class="invert-label">Capture Key</div>
+            <div class="invert-desc">Toggle Metashape dataset capture on/off</div>
+            <button id="captureKeyBtn" class="remap-btn" onclick="recordCaptureKey()">F9</button>
+          </div>
         </div>
 
         <!-- ===== TAB: CALIBRATION ===== -->
@@ -522,6 +572,16 @@
             <span style="font-family:Consolas,monospace; color:#facc15; font-size:12px; width:36px;">m</span>
           </div>
           <div class="theme-picker-row" style="margin-top:10px;">
+            <div class="invert-label">Yaw Step</div>
+            <div class="invert-desc">Yaw hold target change per button press (°)</div>
+            <input type="number" id="yawHoldStepInput"
+                   min="0.1" max="45" step="0.5" value="5"
+                   style="width:72px; background:var(--bg2); border:1px solid var(--p1); color:#facc15;
+                          border-radius:4px; padding:4px 6px; font-size:13px; text-align:center;"
+                   oninput="setYawHoldStep(this.value)">
+            <span style="font-family:Consolas,monospace; color:#facc15; font-size:12px; width:36px;">°</span>
+          </div>
+          <div class="theme-picker-row" style="margin-top:10px;">
             <div class="invert-label">Gain Step</div>
             <div class="invert-desc">Gain change per button press (5% default)</div>
             <input type="number" id="gainStepInput"
@@ -529,6 +589,16 @@
                    style="width:72px; background:var(--bg2); border:1px solid var(--p1); color:#facc15;
                           border-radius:4px; padding:4px 6px; font-size:13px; text-align:center;"
                    oninput="setGainStep(this.value)">
+            <span style="font-family:Consolas,monospace; color:#facc15; font-size:12px; width:36px;">× 100%</span>
+          </div>
+          <div class="theme-picker-row" style="margin-top:10px;">
+            <div class="invert-label">Zoom Step</div>
+            <div class="invert-desc">Camera zoom per R3/L3 press (5% default)</div>
+            <input type="number" id="camZoomStepInput"
+                   min="0.01" max="0.5" step="0.01" value="0.05"
+                   style="width:72px; background:var(--bg2); border:1px solid var(--p1); color:#facc15;
+                          border-radius:4px; padding:4px 6px; font-size:13px; text-align:center;"
+                   oninput="setCamZoomStep(this.value)">
             <span style="font-family:Consolas,monospace; color:#facc15; font-size:12px; width:36px;">× 100%</span>
           </div>
         </div>
@@ -561,6 +631,103 @@
           </div>
         </div>
 
+        <!-- ===== TAB: RANGE CONFIG ===== -->
+        <div class="tab-panel" id="tab-range">
+          <div class="info-note">Set the min/max PWM output for thrusters and arm servos. Values are clamped at runtime — center (1500) is always preserved.</div>
+
+          <div class="invert-section-title">Thrusters (all channels)</div>
+          <div class="range-row">
+            <div class="range-label">PWM Range</div>
+            <span class="range-sep">Min</span>
+            <input class="range-input" type="number" id="range-thr-min" min="1100" max="1500" step="10" value="1100" oninput="setThrusterRange('min',this.value)">
+            <span class="range-sep">Max</span>
+            <input class="range-input" type="number" id="range-thr-max" min="1500" max="1900" step="10" value="1900" oninput="setThrusterRange('max',this.value)">
+          </div>
+
+          <div class="invert-section-title">Arm 1 — Right</div>
+          <div class="range-row">
+            <div class="range-label">Slew</div>
+            <span class="range-sep">Min</span>
+            <input class="range-input" type="number" id="range-arm1_slew-min" min="1000" max="1500" step="10" value="1000" oninput="setArmRange('arm1_slew','min',this.value)">
+            <span class="range-sep">Max</span>
+            <input class="range-input" type="number" id="range-arm1_slew-max" min="1500" max="2000" step="10" value="2000" oninput="setArmRange('arm1_slew','max',this.value)">
+          </div>
+          <div class="range-row">
+            <div class="range-label">Shoulder</div>
+            <span class="range-sep">Min</span>
+            <input class="range-input" type="number" id="range-arm1_shoulder-min" min="1000" max="1500" step="10" value="1000" oninput="setArmRange('arm1_shoulder','min',this.value)">
+            <span class="range-sep">Max</span>
+            <input class="range-input" type="number" id="range-arm1_shoulder-max" min="1500" max="2000" step="10" value="2000" oninput="setArmRange('arm1_shoulder','max',this.value)">
+          </div>
+          <div class="range-row">
+            <div class="range-label">Rotate</div>
+            <span class="range-sep">Min</span>
+            <input class="range-input" type="number" id="range-arm1_rotate-min" min="1000" max="1500" step="10" value="1000" oninput="setArmRange('arm1_rotate','min',this.value)">
+            <span class="range-sep">Max</span>
+            <input class="range-input" type="number" id="range-arm1_rotate-max" min="1500" max="2000" step="10" value="2000" oninput="setArmRange('arm1_rotate','max',this.value)">
+          </div>
+
+          <div class="invert-section-title">Arm 2 — Left</div>
+          <div class="range-row">
+            <div class="range-label">Slew</div>
+            <span class="range-sep">Min</span>
+            <input class="range-input" type="number" id="range-arm2_slew-min" min="1000" max="1500" step="10" value="1000" oninput="setArmRange('arm2_slew','min',this.value)">
+            <span class="range-sep">Max</span>
+            <input class="range-input" type="number" id="range-arm2_slew-max" min="1500" max="2000" step="10" value="2000" oninput="setArmRange('arm2_slew','max',this.value)">
+          </div>
+          <div class="range-row">
+            <div class="range-label">Shoulder</div>
+            <span class="range-sep">Min</span>
+            <input class="range-input" type="number" id="range-arm2_shoulder-min" min="1000" max="1500" step="10" value="1000" oninput="setArmRange('arm2_shoulder','min',this.value)">
+            <span class="range-sep">Max</span>
+            <input class="range-input" type="number" id="range-arm2_shoulder-max" min="1500" max="2000" step="10" value="2000" oninput="setArmRange('arm2_shoulder','max',this.value)">
+          </div>
+          <div class="range-row">
+            <div class="range-label">Rotate</div>
+            <span class="range-sep">Min</span>
+            <input class="range-input" type="number" id="range-arm2_rotate-min" min="1000" max="1500" step="10" value="1000" oninput="setArmRange('arm2_rotate','min',this.value)">
+            <span class="range-sep">Max</span>
+            <input class="range-input" type="number" id="range-arm2_rotate-max" min="1500" max="2000" step="10" value="2000" oninput="setArmRange('arm2_rotate','max',this.value)">
+          </div>
+
+          <div class="invert-section-title">Gripper PWM (Motor Driver)</div>
+          <div class="range-row">
+            <div class="range-label">Right Arm (Arm 1) Gripper</div>
+            <span class="range-sep">Open</span>
+            <input class="range-input" type="number" id="range-arm1_gripper_open" min="1000" max="1499" step="10" value="1300" oninput="setGripperPwm('arm1','open',this.value)">
+            <span class="range-sep">Close</span>
+            <input class="range-input" type="number" id="range-arm1_gripper_close" min="1501" max="2000" step="10" value="1700" oninput="setGripperPwm('arm1','close',this.value)">
+          </div>
+          <div class="range-row">
+            <div class="range-label">Left Arm (Arm 2) Gripper</div>
+            <span class="range-sep">Open</span>
+            <input class="range-input" type="number" id="range-arm2_gripper_open" min="1000" max="1499" step="10" value="1300" oninput="setGripperPwm('arm2','open',this.value)">
+            <span class="range-sep">Close</span>
+            <input class="range-input" type="number" id="range-arm2_gripper_close" min="1501" max="2000" step="10" value="1700" oninput="setGripperPwm('arm2','close',this.value)">
+          </div>
+        </div>
+
+        <!-- Controllers tab -->
+        <div id="tab-controllers" class="tab-content" style="display:none">
+          <div class="section-title">Controller Assignment</div>
+          <p style="font-size:12px;color:var(--s1);margin-bottom:12px;line-height:1.5">
+            Assign any connected controller to Flight or Arm. Use this when auto-detect picks the wrong one or when connecting via USB cable.
+          </p>
+          <button onclick="refreshGamepadList()" style="background:var(--bg3);color:var(--s);border:1px solid var(--p);padding:5px 14px;border-radius:4px;cursor:pointer;font-size:12px;margin-bottom:12px">↺ Refresh</button>
+          <button onclick="clearGpOverrides()" style="background:var(--bg3);color:var(--p1);border:1px solid var(--p);padding:5px 14px;border-radius:4px;cursor:pointer;font-size:12px;margin-bottom:12px;margin-left:8px">✕ Clear Overrides (Auto)</button>
+          <div id="gp-list" style="margin-bottom:14px"></div>
+          <div style="font-size:12px;border-top:1px solid var(--p);padding-top:10px">
+            <div style="margin-bottom:6px">
+              <span style="color:var(--s1)">Flight:</span>&nbsp;
+              <span id="gp-flight-name" style="color:var(--s)">Auto</span>
+            </div>
+            <div>
+              <span style="color:var(--s1)">Arm:</span>&nbsp;
+              <span id="gp-arm-name" style="color:var(--s)">Auto</span>
+            </div>
+          </div>
+        </div>
+
       </div><!-- /modal-body -->
 
       <div class="modal-footer">
@@ -582,6 +749,47 @@
       const link   = document.getElementById('cam-banner-link');
       if (banner) { link.href = camUrl; banner.style.display = 'block'; }
     }
+  })();
+
+  // Set MJPEG src for camera strip feeds
+  const _camHost = location.hostname;
+  ['2','3','4','5'].forEach(n => {
+    const img = document.getElementById(`cs-cam${n}`);
+    img.src = `http://${_camHost}:3000/cam${n}`;
+    img.dataset.base = img.src;
+  });
+
+  // onerror retry for cam strip
+  ['2','3','4','5'].forEach(n => {
+    document.getElementById(`cs-cam${n}`).addEventListener('error', function() {
+      const base = this.dataset.base;
+      if (base) setTimeout(() => { this.src = base + '?t=' + Date.now(); }, 3000);
+    });
+  });
+
+  // Canvas watchdog — detects frozen cam strip feeds
+  ;(function() {
+    const cv  = document.createElement('canvas');
+    cv.width  = 8; cv.height = 8;
+    const ctx = cv.getContext('2d', { willReadFrequently: true });
+    const cams = ['2','3','4','5'];
+    const st = Object.fromEntries(cams.map(n => [n, { hash: null, ticks: 0 }]));
+    setInterval(() => {
+      cams.forEach(n => {
+        const img = document.getElementById(`cs-cam${n}`);
+        if (!img || !img.src || img.naturalWidth === 0) { st[n].hash = null; st[n].ticks = 0; return; }
+        let hash;
+        try { ctx.drawImage(img, 0, 0, 8, 8); hash = ctx.getImageData(0, 0, 8, 8).data.join(','); }
+        catch { return; }
+        if (hash === st[n].hash) {
+          if (++st[n].ticks >= 4) {
+            st[n].hash = null; st[n].ticks = 0;
+            const base = img.dataset.base;
+            if (base) { img.src = ''; setTimeout(() => { img.src = base + '?t=' + Date.now(); }, 500); }
+          }
+        } else { st[n].hash = hash; st[n].ticks = 0; }
+      });
+    }, 5000);
   })();
 
   const socket = io();
@@ -643,30 +851,32 @@
       }
     });
 
-    const arm1GripperClose = document.getElementById('arm1_gripper_close');
-    const arm1GripperOpen  = document.getElementById('arm1_gripper_open');
-    if (data.arm1_gripper === 1) { arm1GripperClose.classList.add('active'); arm1GripperOpen.classList.remove('active'); }
-    else if (data.arm1_gripper === 2) { arm1GripperClose.classList.remove('active'); arm1GripperOpen.classList.add('active'); }
-    else { arm1GripperClose.classList.remove('active'); arm1GripperOpen.classList.remove('active'); }
-
-    const arm2GripperClose = document.getElementById('arm2_gripper_close');
-    const arm2GripperOpen  = document.getElementById('arm2_gripper_open');
-    if (data.arm2_gripper === 1) { arm2GripperClose.classList.add('active'); arm2GripperOpen.classList.remove('active'); }
-    else if (data.arm2_gripper === 2) { arm2GripperClose.classList.remove('active'); arm2GripperOpen.classList.add('active'); }
-    else { arm2GripperClose.classList.remove('active'); arm2GripperOpen.classList.remove('active'); }
   });
 
   let yawAccum = 0; let lastYaw = null; let gpIndex = null; let gpArmIndex = null;
+  let gpFlightOverride = JSON.parse(localStorage.getItem('gpFlightOverride') ?? 'null');
+  let gpArmOverride    = JSON.parse(localStorage.getItem('gpArmOverride')    ?? 'null');
+  if (gpFlightOverride !== null) gpIndex    = gpFlightOverride;
+  if (gpArmOverride    !== null) gpArmIndex = gpArmOverride;
   const ARM_SLOW_GAIN = 0.3, ARM_NORMAL_GAIN = 0.6, ARM_FAST_GAIN = 1.0;
   let yawOrigin = 0, pitchDisplayOffset = 0, rollDisplayOffset = 0;
   let latestPitchDeg = 0;
-  let pixhawkTimeout = null;
+  let teensyTimeout = null;
+  let camZooms = [1.0, 1.0, 1.0, 1.0, 1.0];
+  let selectedCam = 0;
 
   socket.on('disconnect', () => {
-    clearTimeout(pixhawkTimeout);
-    const connEl = document.getElementById('conn');
-    connEl.innerText = 'DISCONNECTED';
-    connEl.style.color = '#f87171';
+    clearTimeout(teensyTimeout);
+  });
+
+  socket.on('cam-restart', ({ cam }) => {
+    const img = document.getElementById(`cs-cam${cam}`);
+    if (!img) return;
+    // Don't clear img.src — new GStreamer frames flow into the existing HTTP connection.
+    // Only force a fresh connection if the feed has actually frozen (canvas watchdog covers that).
+    // Just update the src quietly with a cache-buster so stale connections get replaced.
+    const base = img.dataset.base || `http://${_camHost}:3000/cam${cam}`;
+    setTimeout(() => { if (img.src) img.src = base + '?t=' + Date.now(); }, 2000);
   });
 
   socket.on('robot-data', (data) => {
@@ -674,15 +884,9 @@
     const pitch = Number(data.pitch) || 0;
     const roll = Number(data.roll) || 0;
 
-    if (data.pixhawkLive) {
-      const connEl = document.getElementById('conn');
-      connEl.innerText = 'CONNECTED';
-      connEl.style.color = '#22c55e';
-      clearTimeout(pixhawkTimeout);
-      pixhawkTimeout = setTimeout(() => {
-        connEl.innerText = 'DISCONNECTED';
-        connEl.style.color = '#f87171';
-      }, 3000);
+    if (data.teensyLive) {
+      clearTimeout(teensyTimeout);
+      teensyTimeout = setTimeout(() => {}, 3000);
     }
 
     if (lastYaw === null) yawAccum = yaw;
@@ -709,6 +913,7 @@
     latestRollDeg  = roll;
     latestPitchDeg = pitch;
     latestDepth    = Number(data.depth) || 0;
+    latestYawDeg   = yawAccum;
   });
 
   const leftStick = document.getElementById('leftStick');
@@ -721,26 +926,54 @@
 
   let nx = 0, ny = 0, yawNorm = 0, verticalNorm = 0;
   const modeGains = {
-    fast: { surge: 0.65, sway: 0.65, yaw: 0.65 },
-    slow: { surge: 0.30, sway: 0.30, yaw: 0.30 }
+    fast: { surge: 0.65, sway: 0.65, yaw: 0.65, diagonal: 0.65 },
+    slow: { surge: 0.30, sway: 0.30, yaw: 0.30, diagonal: 0.30 }
   };
   let speedMode = 'fast'; // 'fast' | 'slow'
   let surgeGain = 0.65, verticalGain = 0.50, currentPitch = 0, currentRoll = 0;
   let swayGain = 0.65, yawGain = 0.65, rollGain = 0.50;
+  let diagonalGain = 0.65;
   let gainStep = parseFloat(localStorage.getItem('gainStep') || '0.05');
+  let camZoomStep = parseFloat(localStorage.getItem('camZoomStep') || '0.05');
   let prevHatX = 0, prevHatY = 0;
   let gainUpWas = false, gainDownWas = false, vgUpWas = false, vgDownWas = false;
-  let depthHoldWas=false, rollHoldWas=false, stabilizeWas=false;
+  let depthHoldWas=false, rollHoldWas=false, yawHoldWas=false;
   let depthUpWas=false, depthDownWas=false;
+  let yawStepCWWas=false, yawStepCCWWas=false;
   let arm1Rot1100Was=false, arm1Rot1900Was=false,
       arm2Rot1100Was=false, arm2Rot1900Was=false;
   let armBtnWas=false, disarmBtnWas=false;
+  let optionsBtnWas=false, camZoomInWas=false, camZoomOutWas=false, promoteCamWas=false;
+  let light1Was=false, light2Was=false, light3Was=false, light4Was=false;
+  let arm1Grip1100Was=false, arm1Grip1900Was=false, arm2Grip1100Was=false, arm2Grip1900Was=false;
 
   let offsetX = 0, offsetY = 0, offsetYaw = 0, offsetThrottle = 0;
   let btn8WasPressed = false;
 
   const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
-  const mixToPwm = (v) => Math.round(clamp(1500 + v * 400, 1100, 1900));
+  const mixToPwm = (v) => {
+    const scale = (thrusterRange.max - thrusterRange.min) / 2;
+    return Math.round(clamp(1500 + v * scale, thrusterRange.min, thrusterRange.max));
+  };
+
+  /* ============ PWM RANGE ============ */
+  const DEFAULT_THRUSTER_RANGE = { min: 1100, max: 1900 };
+  const DEFAULT_ARM_RANGE = {
+    arm1_slew:     { min: 1000, max: 2000 },
+    arm1_shoulder: { min: 1000, max: 2000 },
+    arm1_rotate:   { min: 1000, max: 2000 },
+    arm2_slew:     { min: 1000, max: 2000 },
+    arm2_shoulder: { min: 1000, max: 2000 },
+    arm2_rotate:   { min: 1000, max: 2000 },
+  };
+
+  const DEFAULT_GRIPPER_PWM = {
+    arm1_open: 1300, arm1_close: 1700,
+    arm2_open: 1300, arm2_close: 1700,
+  };
+  let gripperPwm = JSON.parse(localStorage.getItem('gripperPwm') || 'null') || { ...DEFAULT_GRIPPER_PWM };
+  let thrusterRange = JSON.parse(localStorage.getItem('thrusterRange') || 'null') || { ...DEFAULT_THRUSTER_RANGE };
+  let armRange      = JSON.parse(localStorage.getItem('armRange')      || 'null') || JSON.parse(JSON.stringify(DEFAULT_ARM_RANGE));
 
   /* ============ AXIS INVERSION ============ */
   const DEFAULT_INVERT = {
@@ -782,6 +1015,60 @@
     return state === 1 ? 2 : 1;
   }
 
+  /* ============ PWM RANGE FUNCTIONS ============ */
+  function setThrusterRange(side, val) {
+    const v = parseInt(val);
+    if (isNaN(v)) return;
+    thrusterRange[side] = side === 'min' ? clamp(v, 1100, 1500) : clamp(v, 1500, 1900);
+    saveRange();
+  }
+
+  function setArmRange(channel, side, val) {
+    const v = parseInt(val);
+    if (isNaN(v)) return;
+    armRange[channel][side] = side === 'min' ? clamp(v, 1000, 1500) : clamp(v, 1500, 2000);
+    applyArmSliderRange(channel);
+    saveRange();
+  }
+
+  function applyArmSliderRange(channel) {
+    const el = document.getElementById(channel);
+    if (el) { el.min = armRange[channel].min; el.max = armRange[channel].max; }
+  }
+
+  function setGripperPwm(arm, side, val) {
+    const v = parseInt(val);
+    if (isNaN(v)) return;
+    const key = `${arm}_${side}`;
+    gripperPwm[key] = side === 'open' ? clamp(v, 1000, 1499) : clamp(v, 1501, 2000);
+    saveRange();
+  }
+
+  function saveRange() {
+    localStorage.setItem('thrusterRange', JSON.stringify(thrusterRange));
+    localStorage.setItem('armRange',      JSON.stringify(armRange));
+    localStorage.setItem('gripperPwm',    JSON.stringify(gripperPwm));
+  }
+
+  function renderRangeInputs() {
+    const setV = (id, v) => { const el = document.getElementById(id); if (el) el.value = v; };
+    setV('range-thr-min', thrusterRange.min);
+    setV('range-thr-max', thrusterRange.max);
+    for (const ch of Object.keys(DEFAULT_ARM_RANGE)) {
+      setV(`range-${ch}-min`, armRange[ch].min);
+      setV(`range-${ch}-max`, armRange[ch].max);
+    }
+    setV('range-arm1_gripper_open',  gripperPwm.arm1_open);
+    setV('range-arm1_gripper_close', gripperPwm.arm1_close);
+    setV('range-arm2_gripper_open',  gripperPwm.arm2_open);
+    setV('range-arm2_gripper_close', gripperPwm.arm2_close);
+  }
+
+  function saveRangeToDisk() {
+    return fetch('/api/range', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ thrusterRange, armRange, gripperPwm }) });
+  }
+
   /* ============ DOF MODE ============ */
   let activeModes = new Set();
   const DOF_MODES = ['surge','sway','heave','yaw','pitch','roll'];
@@ -817,52 +1104,72 @@
     updateThrusters();
   }
 
+  /* ============ LIGHTS ============ */
+  const lightStates = { 1: false, 2: false, 3: false, 4: false };
+
+  function toggleLight(index) {
+    lightStates[index] = !lightStates[index];
+    socket.emit('set-relay', { index, state: lightStates[index] });
+    document.getElementById(`light-btn-${index}`).classList.toggle('active', lightStates[index]);
+  }
+
+  socket.on('relay-state', ({ index, state }) => {
+    lightStates[index] = state;
+    const btn = document.getElementById(`light-btn-${index}`);
+    if (btn) btn.classList.toggle('active', state);
+  });
+
+  socket.on('relay-states', (states) => {
+    for (const [k, v] of Object.entries(states)) {
+      lightStates[k] = v;
+      const btn = document.getElementById(`light-btn-${k}`);
+      if (btn) btn.classList.toggle('active', v);
+    }
+  });
+
   /* ============ HOLD MODES ============ */
   const DEPTH_HOLD_KP = 1.5;  // m^-1: 0.67 m error → full vertical thrust
+  const DEPTH_HOLD_KI = 0.3;  // integral gain — drives steady-state buoyancy error to zero
   const ROLL_HOLD_KP  = 0.02; // deg^-1: 50° error → full roll correction
+  const YAW_HOLD_KP   = 0.05; // deg^-1: 20° error → full yaw correction
+  const YAW_HOLD_KI   = 0.005;
 
   let depthHoldActive = false, depthHoldTarget = 0;
   let depthHoldStep = parseFloat(localStorage.getItem('depthHoldStep') || '0.02');
+  let yawHoldStep   = parseFloat(localStorage.getItem('yawHoldStep')   || '5');
   let rollHoldActive  = true,  rollHoldTarget  = 0;
-  let stabilizeActive = false;
-  let preStabilizeDepthHold = false, preStabilizeRollHold = false;
+  let yawHoldActive   = false, yawHoldTarget   = 0;
 
   let latestDepth   = 0;
   let latestRollDeg = 0;
-  let depthCorrection = 0;
-  let rollCorrection  = 0;
+  let latestYawDeg  = 0;
+  let depthCorrection   = 0;
+  let depthIntegral     = 0;
+  let rollCorrection    = 0;
+  let yawHoldCorrection = 0;
+  let yawHoldIntegral   = 0;
 
   function setHoldMode(mode) {
     if (mode === 'depth') {
       depthHoldActive = !depthHoldActive;
-      if (depthHoldActive) { depthHoldTarget = latestDepth; stabilizeActive = false; }
-      else depthCorrection = 0;
+      if (depthHoldActive) { depthHoldTarget = latestDepth; depthIntegral = 0; }
+      else { depthCorrection = 0; depthIntegral = 0; }
     } else if (mode === 'roll') {
       rollHoldActive = !rollHoldActive;
-      if (rollHoldActive) { stabilizeActive = false; }
-      else rollCorrection = 0;
-    } else if (mode === 'stabilize') {
-      stabilizeActive = !stabilizeActive;
-      if (stabilizeActive) {
-        preStabilizeDepthHold = depthHoldActive;
-        preStabilizeRollHold  = rollHoldActive;
-        depthHoldActive = true;  depthHoldTarget = latestDepth;
-        rollHoldActive  = true;
-      } else {
-        depthHoldActive = preStabilizeDepthHold;
-        rollHoldActive  = preStabilizeRollHold;
-        if (!depthHoldActive) depthCorrection = 0;
-        if (!rollHoldActive)  rollCorrection  = 0;
-      }
+      if (!rollHoldActive) rollCorrection = 0;
+    } else if (mode === 'yaw') {
+      yawHoldActive = !yawHoldActive;
+      if (yawHoldActive) { yawHoldTarget = latestYawDeg; yawHoldIntegral = 0; }
+      else { yawHoldCorrection = 0; yawHoldIntegral = 0; }
     }
     renderHoldButtons();
   }
 
   function renderHoldButtons() {
     const states = {
-      'hbtn-depth':     depthHoldActive,
-      'hbtn-roll':      rollHoldActive,
-      'hbtn-stabilize': stabilizeActive,
+      'hbtn-depth': depthHoldActive,
+      'hbtn-roll':  rollHoldActive,
+      'hbtn-yaw':   yawHoldActive,
     };
     for (const [id, active] of Object.entries(states)) {
       const btn = document.getElementById(id);
@@ -881,11 +1188,13 @@
     btnTrigger: 0, btnCalib: 8,
     btnGainUp: 4, btnGainDown: 2, btnVGainUp: 5, btnVGainDown: 3,
     axisHatX: 4, axisHatY: 5,
-    btnDepthHold: -1, btnRollHold: -1, btnStabilize: -1,
+    btnDepthHold: -1, btnRollHold: -1, btnYawHold: -1,
     btnDepthUp: -1, btnDepthDown: -1,
+    btnYawStepCW: -1, btnYawStepCCW: -1,
     btnArm1Rotate1100: -1, btnArm1Rotate1900: -1,
     btnArm2Rotate1100: -1, btnArm2Rotate1900: -1,
     btnArm: -1, btnDisarm: -1,
+    btnLight1: -1, btnLight2: -1, btnLight3: -1, btnLight4: -1,
   };
 
   const DOF_BIND_KEYS = ['btnModeSurge','btnModeSway','btnModeHeave','btnModeYaw','btnModePitch','btnModeRoll'];
@@ -902,23 +1211,33 @@
     axisLeftY:          1,  // left arm shoulder (Left Y)
     axisRightX:         2,  // right arm slew (Right X)
     axisRightY:         3,  // right arm shoulder (Right Y)
+    axisArm1Gripper:   -1,  // right arm gripper axis (unbound)
+    axisArm2Gripper:   -1,  // left arm gripper axis (unbound)
+    btnArm1Gripper1100: -1, // right arm gripper 1100 (unbound)
+    btnArm1Gripper1900: -1, // right arm gripper 1900 (unbound)
+    btnArm2Gripper1100: -1, // left arm gripper 1100 (unbound)
+    btnArm2Gripper1900: -1, // left arm gripper 1900 (unbound)
     btnSlowMode:        4,  // L1
     btnFastMode:        5,  // R1
     // R2 modifier — right arm rotate + gripper
     btnR2Mod:           7,  // R2
     btnArm1RotateCCW:   2,  // Square
     btnArm1RotateCW:    1,  // Circle
-    btnArm1GripperOpen: 3,  // Triangle
-    btnArm1GripperClose:0,  // Cross
     // L2 modifier — left arm rotate + gripper
     btnL2Mod:           6,  // L2
     btnArm2RotateCCW:  14,  // D-Pad Left
     btnArm2RotateCW:   15,  // D-Pad Right
-    btnArm2GripperOpen:12,  // D-Pad Up
-    btnArm2GripperClose:13, // D-Pad Down
+    btnCamSelect:        9,  // Options
+    btnCamZoomIn:       11,  // R3
+    btnCamZoomOut:      10,  // L3
+    btnPromoteCam:      -1,  // unbound by default
   };
-  let armBindings = JSON.parse(localStorage.getItem('gpArmBindings') || 'null') || {...DEFAULT_ARM_BINDINGS};
+  let armBindings = { ...DEFAULT_ARM_BINDINGS, ...(JSON.parse(localStorage.getItem('gpArmBindings') || 'null') || {}) };
   function saveArmBindings() { localStorage.setItem('gpArmBindings', JSON.stringify(armBindings)); }
+
+  function emitCamZoomState() {
+    socket.emit('cam-zoom-state', { selectedCam, camZooms: [...camZooms] });
+  }
 
   const ARM_BINDING_META = [
     { section: 'DualSense — Arm Axes' },
@@ -926,6 +1245,13 @@
     { key: 'axisLeftY',           label: 'Left Arm Shoulder',          type: 'axis',   controller: 'arm' },
     { key: 'axisRightX',          label: 'Right Arm Slew',             type: 'axis',   controller: 'arm' },
     { key: 'axisRightY',          label: 'Right Arm Shoulder',         type: 'axis',   controller: 'arm' },
+    { key: 'axisArm1Gripper',      label: 'Right Arm Gripper',          type: 'axis',   controller: 'arm' },
+    { key: 'axisArm2Gripper',      label: 'Left Arm Gripper',           type: 'axis',   controller: 'arm' },
+    { section: 'Gripper Buttons' },
+    { key: 'btnArm1Gripper1100',   label: 'Right Arm Gripper Open',     type: 'button', controller: 'arm' },
+    { key: 'btnArm1Gripper1900',   label: 'Right Arm Gripper Close',    type: 'button', controller: 'arm' },
+    { key: 'btnArm2Gripper1100',   label: 'Left Arm Gripper Open',      type: 'button', controller: 'arm' },
+    { key: 'btnArm2Gripper1900',   label: 'Left Arm Gripper Close',     type: 'button', controller: 'arm' },
     { section: 'Arm Speed Mode' },
     { key: 'btnSlowMode',         label: 'Slow Mode (L1)',              type: 'button', controller: 'arm' },
     { key: 'btnFastMode',         label: 'Fast Mode (R1)',              type: 'button', controller: 'arm' },
@@ -933,14 +1259,15 @@
     { key: 'btnR2Mod',            label: 'R2 (Modifier)',               type: 'button', controller: 'arm' },
     { key: 'btnArm1RotateCCW',    label: 'Rotate Anticlockwise (□)',   type: 'button', controller: 'arm' },
     { key: 'btnArm1RotateCW',     label: 'Rotate Clockwise (○)',       type: 'button', controller: 'arm' },
-    { key: 'btnArm1GripperOpen',  label: 'Gripper Open (△)',           type: 'button', controller: 'arm' },
-    { key: 'btnArm1GripperClose', label: 'Gripper Close (✕)',          type: 'button', controller: 'arm' },
     { section: 'Left Arm — Hold L2 + button' },
     { key: 'btnL2Mod',            label: 'L2 (Modifier)',               type: 'button', controller: 'arm' },
     { key: 'btnArm2RotateCCW',    label: 'Rotate Anticlockwise (←)',   type: 'button', controller: 'arm' },
     { key: 'btnArm2RotateCW',     label: 'Rotate Clockwise (→)',       type: 'button', controller: 'arm' },
-    { key: 'btnArm2GripperOpen',  label: 'Gripper Open (↑)',           type: 'button', controller: 'arm' },
-    { key: 'btnArm2GripperClose', label: 'Gripper Close (↓)',          type: 'button', controller: 'arm' },
+    { section: 'Camera Zoom' },
+    { key: 'btnCamSelect',  label: 'Cycle Camera Selection (Options)',  type: 'button', controller: 'arm' },
+    { key: 'btnCamZoomIn',  label: 'Zoom In (R3)',                      type: 'button', controller: 'arm' },
+    { key: 'btnCamZoomOut', label: 'Zoom Out (L3)',                     type: 'button', controller: 'arm' },
+    { key: 'btnPromoteCam', label: 'Promote Selected Camera to Main',   type: 'button', controller: 'arm' },
   ];
 
   /* ============ THEME ============ */
@@ -992,11 +1319,27 @@
     if (inp) inp.value = v;
   }
 
+  function setYawHoldStep(val) {
+    const v = Math.max(0.1, Math.min(45, parseFloat(val) || 5));
+    yawHoldStep = v;
+    localStorage.setItem('yawHoldStep', v);
+    const inp = document.getElementById('yawHoldStepInput');
+    if (inp) inp.value = v;
+  }
+
   function setGainStep(val) {
     const v = Math.max(0.01, Math.min(0.5, parseFloat(val) || 0.05));
     gainStep = v;
     localStorage.setItem('gainStep', v);
     const inp = document.getElementById('gainStepInput');
+    if (inp) inp.value = v;
+  }
+
+  function setCamZoomStep(val) {
+    const v = Math.max(0.01, Math.min(0.5, parseFloat(val) || 0.05));
+    camZoomStep = v;
+    localStorage.setItem('camZoomStep', v);
+    const inp = document.getElementById('camZoomStepInput');
     if (inp) inp.value = v;
   }
 
@@ -1041,7 +1384,7 @@
   }
 
   function saveToDisk() {
-    Promise.all([saveBindingsToDisk(), saveInvertToDisk()])
+    Promise.all([saveBindingsToDisk(), saveInvertToDisk(), saveRangeToDisk()])
       .then(() => {
         const btn = document.querySelector('.modal-save-btn');
         const orig = btn.textContent;
@@ -1053,6 +1396,19 @@
 
   fetch('/api/bindings').then(r => r.json()).then(data => { bindings = { ...DEFAULT_BINDINGS, ...data }; scrubDofBindings(); }).catch(() => {});
   fetch('/api/invert').then(r => r.json()).then(data => { axisInvert = { ...DEFAULT_INVERT, ...data }; saveInvert(); renderInvertButtons(); }).catch(() => {});
+  fetch('/api/range').then(r => r.json()).then(data => {
+    if (data.thrusterRange) thrusterRange = { ...DEFAULT_THRUSTER_RANGE, ...data.thrusterRange };
+    if (data.armRange) {
+      armRange = { ...JSON.parse(JSON.stringify(DEFAULT_ARM_RANGE)) };
+      for (const ch of Object.keys(DEFAULT_ARM_RANGE)) {
+        if (data.armRange[ch]) armRange[ch] = { ...DEFAULT_ARM_RANGE[ch], ...data.armRange[ch] };
+      }
+    }
+    if (data.gripperPwm) gripperPwm = { ...DEFAULT_GRIPPER_PWM, ...data.gripperPwm };
+    saveRange();
+    for (const ch of Object.keys(DEFAULT_ARM_RANGE)) applyArmSliderRange(ch);
+    renderRangeInputs();
+  }).catch(() => {});
 
   const BINDING_META = [
     { section: 'Axes' },
@@ -1073,9 +1429,11 @@
     { section: 'Hold Modes' },
     { key: 'btnDepthHold', label: 'Depth Hold',      type: 'button' },
     { key: 'btnRollHold',  label: 'Roll Hold',       type: 'button' },
-    { key: 'btnStabilize', label: 'Stabilize',       type: 'button' },
-    { key: 'btnDepthUp',   label: 'Depth Target +',  type: 'button' },
-    { key: 'btnDepthDown', label: 'Depth Target −',  type: 'button' },
+    { key: 'btnYawHold',   label: 'Yaw Hold',         type: 'button' },
+    { key: 'btnDepthUp',    label: 'Depth Target +',      type: 'button' },
+    { key: 'btnDepthDown',  label: 'Depth Target −',      type: 'button' },
+    { key: 'btnYawStepCW',  label: 'Yaw Target CW (+°)',  type: 'button' },
+    { key: 'btnYawStepCCW', label: 'Yaw Target CCW (−°)', type: 'button' },
     { section: 'Arm Rotate' },
     { key: 'btnArm1Rotate1100', label: 'Right Arm Rotate 1100', type: 'button' },
     { key: 'btnArm1Rotate1900', label: 'Right Arm Rotate 1900', type: 'button' },
@@ -1084,6 +1442,11 @@
     { section: 'Arm State' },
     { key: 'btnArm',    label: 'ARM',    type: 'button' },
     { key: 'btnDisarm', label: 'DISARM', type: 'button' },
+    { section: 'Lights' },
+    { key: 'btnLight1', label: 'Toggle Light 1', type: 'button' },
+    { key: 'btnLight2', label: 'Toggle Light 2', type: 'button' },
+    { key: 'btnLight3', label: 'Toggle Light 3', type: 'button' },
+    { key: 'btnLight4', label: 'Toggle Light 4', type: 'button' },
   ];
 
   let remapTarget = null;
@@ -1100,6 +1463,7 @@
     });
     if (tabId === 'tab-bindings') renderBindings();
     if (tabId === 'tab-axes') renderInvertButtons();
+    if (tabId === 'tab-range') renderRangeInputs();
   }
 
   function renderBindings() {
@@ -1115,29 +1479,83 @@
       const src = controller === 'arm' ? armBindings : bindings;
       const listening = remapTarget === key && remapController === controller;
       const valueText = listening
-        ? `Move ${type}...`
+        ? (type === 'button' ? 'Move axis / press btn / key...' : 'Move axis...')
+        : isKeyBinding(src[key]) ? `Key: ${keyDisplayName(src[key])}`
         : `${type === 'axis' ? 'Axis' : 'Button'} ${src[key]}`;
       list.innerHTML += `
         <div class="binding-row">
           <div class="binding-label">${label}</div>
           <div class="binding-value${listening ? ' listening' : ''}">${valueText}</div>
           <button class="remap-btn${listening ? ' active' : ''}" onclick="startRemap('${key}','${controller}')">${listening ? 'Cancel' : 'Remap'}</button>
+          <button class="reset-bind-btn" onclick="resetBinding('${key}','${controller}')" title="Unbind">x</button>
         </div>`;
     }
+  }
+
+  function resetBinding(key, controller) {
+    if (controller === 'arm') { armBindings[key] = -1; saveArmBindings(); }
+    else { bindings[key] = -1; saveBindings(); }
+    renderBindings();
   }
 
   function openSettings() {
     renderInvertButtons();
     renderBindings();
+    renderRangeInputs();
+    loadCaptureKey();
     const dsi = document.getElementById('depthHoldStepInput');
     if (dsi) dsi.value = depthHoldStep;
+    const ysi = document.getElementById('yawHoldStepInput');
+    if (ysi) ysi.value = yawHoldStep;
     const gsi = document.getElementById('gainStepInput');
     if (gsi) gsi.value = gainStep;
+    const czsi = document.getElementById('camZoomStepInput');
+    if (czsi) czsi.value = camZoomStep;
     document.getElementById('settingsModal').classList.add('open');
+  }
+
+  async function loadCaptureKey() {
+    try {
+      const res = await fetch('/api/capture-key');
+      const data = await res.json();
+      const btn = document.getElementById('captureKeyBtn');
+      if (btn) btn.textContent = data.key || 'F9';
+    } catch {}
+  }
+
+  let _captureKeyHandler = null;
+
+  function recordCaptureKey() {
+    const btn = document.getElementById('captureKeyBtn');
+    if (!btn) return;
+    if (_captureKeyHandler) {
+      document.removeEventListener('keydown', _captureKeyHandler);
+      _captureKeyHandler = null;
+    }
+    btn.textContent = '...';
+    btn.style.color = '#facc15';
+    _captureKeyHandler = (e) => {
+      e.preventDefault();
+      const keyName = e.key === ' ' ? 'Space' : e.key;
+      btn.textContent = keyName;
+      btn.style.color = '';
+      fetch('/api/capture-key', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key: keyName })
+      });
+      document.removeEventListener('keydown', _captureKeyHandler);
+      _captureKeyHandler = null;
+    };
+    document.addEventListener('keydown', _captureKeyHandler);
   }
 
   function closeSettings() {
     remapTarget = null;
+    if (_remapKeyHandler) {
+      document.removeEventListener('keydown', _remapKeyHandler, true);
+      _remapKeyHandler = null;
+    }
     document.getElementById('settingsModal').classList.remove('open');
     localStorage.setItem('themeColors', JSON.stringify({
       primary:   document.getElementById('colorPrimary').value,
@@ -1156,12 +1574,44 @@
       saveBindings();
       saveArmBindings();
       renderBindings();
+    } else if (activeTab === 'tab-range') {
+      thrusterRange = { ...DEFAULT_THRUSTER_RANGE };
+      armRange = JSON.parse(JSON.stringify(DEFAULT_ARM_RANGE));
+      gripperPwm = { ...DEFAULT_GRIPPER_PWM };
+      for (const ch of Object.keys(DEFAULT_ARM_RANGE)) applyArmSliderRange(ch);
+      saveRange();
+      renderRangeInputs();
     }
   }
 
   function startRemap(key, controller = 'flight') {
-    if (remapTarget === key && remapController === controller) { remapTarget = null; remapController = null; }
-    else { remapTarget = key; remapController = controller; }
+    // Cancel any active keyboard-remap listener
+    if (_remapKeyHandler) {
+      document.removeEventListener('keydown', _remapKeyHandler, true);
+      _remapKeyHandler = null;
+    }
+    if (remapTarget === key && remapController === controller) {
+      remapTarget = null; remapController = null;
+    } else {
+      remapTarget = key; remapController = controller;
+      // For button-type bindings: also accept a keyboard key press
+      const allMeta = [...BINDING_META, ...ARM_BINDING_META];
+      const meta = allMeta.find(m => m.key === key);
+      if (meta?.type === 'button') {
+        _remapKeyHandler = (e) => {
+          if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+          e.preventDefault();
+          const src = controller === 'arm' ? armBindings : bindings;
+          src[remapTarget] = `key:${e.code}`;
+          if (controller === 'arm') saveArmBindings(); else saveBindings();
+          remapTarget = null; remapController = null;
+          document.removeEventListener('keydown', _remapKeyHandler, true);
+          _remapKeyHandler = null;
+          renderBindings();
+        };
+        document.addEventListener('keydown', _remapKeyHandler, true);
+      }
+    }
     renderBindings();
   }
 
@@ -1185,10 +1635,10 @@
 
   function updateUIElements() {
     const any = activeModes.size > 0;
-    const dispX     = (stabilizeActive || (any && !activeModes.has('sway')))  ? 0 : nx * (axisInvert.sway  ? -1 : 1);
-    const dispY     = (stabilizeActive || (any && !activeModes.has('surge'))) ? 0 : ny * (axisInvert.surge ? -1 : 1);
-    const dispYaw   = (stabilizeActive || (any && !activeModes.has('yaw')))   ? 0 : yawNorm;
-    const dispPitch = (stabilizeActive || (any && !activeModes.has('pitch'))) ? 0 : currentPitch;
+    const dispX     = (any && !activeModes.has('sway'))  ? 0 : nx * (axisInvert.sway  ? -1 : 1);
+    const dispY     = (any && !activeModes.has('surge')) ? 0 : ny * (axisInvert.surge ? -1 : 1);
+    const dispYaw   = yawHoldActive ? yawHoldCorrection : ((any && !activeModes.has('yaw')) ? 0 : yawNorm);
+    const dispPitch = (any && !activeModes.has('pitch')) ? 0 : currentPitch;
     const dispHeave = depthHoldActive ? depthCorrection
                     : (any && !activeModes.has('heave') ? 0 : verticalNorm);
     const dispRoll  = rollHoldActive  ? rollCorrection
@@ -1197,11 +1647,12 @@
     leftStick.style.transform = `translate(calc(-50% + ${dispX * 40}px), calc(-50% + ${dispY * 40}px))`;
 
 
-    // Always update all 5 independent gain values
+    // Always update all independent gain values
     document.getElementById('valGain').textContent     = Math.round(surgeGain    * 100) + '%';
     document.getElementById('valVGain').textContent    = Math.round(verticalGain * 100) + '%';
     document.getElementById('valSwayGain').textContent = Math.round(swayGain     * 100) + '%';
     document.getElementById('valYawGain').textContent  = Math.round(yawGain      * 100) + '%';
+    document.getElementById('valDiagGain').textContent = Math.round(diagonalGain * 100) + '%';
     document.getElementById('valRollGain').textContent = Math.round(rollGain     * 100) + '%';
 
     // Depth hold target display
@@ -1236,9 +1687,9 @@
       return;
     }
     const any = activeModes.size > 0;
-    const forward  = (stabilizeActive || (any && !activeModes.has('surge'))) ? 0 : -ny;
-    const strafe   = (stabilizeActive || (any && !activeModes.has('sway')))  ? 0 : nx;
-    const yaw      = (stabilizeActive || (any && !activeModes.has('yaw')))   ? 0 : yawNorm;
+    const forward  = (any && !activeModes.has('surge')) ? 0 : -ny;
+    const strafe   = (any && !activeModes.has('sway'))  ? 0 : nx;
+    const yaw      = yawHoldActive ? yawHoldCorrection : ((any && !activeModes.has('yaw')) ? 0 : yawNorm);
     const vertical = depthHoldActive ? depthCorrection
                    : (any && !activeModes.has('heave') ? 0 : verticalNorm);
     const roll     = rollHoldActive  ? rollCorrection
@@ -1270,10 +1721,10 @@
   function emitJoystick() {
     if (!isArmed) return;
     const any = activeModes.size > 0;
-    const effX      = (stabilizeActive || (any && !activeModes.has('sway')))  ? 0 : nx;
-    const effY      = (stabilizeActive || (any && !activeModes.has('surge'))) ? 0 : ny;
-    const effYaw    = (stabilizeActive || (any && !activeModes.has('yaw')))   ? 0 : yawNorm;
-    const effPitch  = (stabilizeActive || (any && !activeModes.has('pitch'))) ? 0 : currentPitch;
+    const effX      = (any && !activeModes.has('sway'))  ? 0 : nx;
+    const effY      = (any && !activeModes.has('surge')) ? 0 : ny;
+    const effYaw    = yawHoldActive ? yawHoldCorrection : ((any && !activeModes.has('yaw')) ? 0 : yawNorm);
+    const effPitch  = (any && !activeModes.has('pitch')) ? 0 : currentPitch;
     const effHeave  = depthHoldActive ? depthCorrection
                     : (any && !activeModes.has('heave') ? 0 : verticalNorm);
     const effRoll   = rollHoldActive  ? rollCorrection
@@ -1322,6 +1773,31 @@
   document.getElementById('trackpad').addEventListener('pointercancel', resetPad);
   window.addEventListener('resize', updateThrusters);
 
+  /* ============ KEYBOARD BINDINGS ============ */
+  const pressedKeys = new Set();
+  let _remapKeyHandler = null;
+
+  function isKeyBinding(val) { return typeof val === 'string' && val.startsWith('key:'); }
+
+  function keyDisplayName(val) {
+    const code = val.slice(4);
+    const nice = {
+      Space:'Space', Enter:'Enter', Escape:'Esc', Backspace:'Bksp', Tab:'Tab',
+      ArrowUp:'↑', ArrowDown:'↓', ArrowLeft:'←', ArrowRight:'→',
+      ShiftLeft:'L-Shift', ShiftRight:'R-Shift',
+      ControlLeft:'L-Ctrl', ControlRight:'R-Ctrl',
+      AltLeft:'L-Alt', AltRight:'R-Alt',
+    };
+    return nice[code] || code.replace(/^(Key|Digit|Numpad)/, '').replace(/^F(\d)$/, 'F$1');
+  }
+
+  function isSettingsOpen() {
+    return document.getElementById('settingsModal').classList.contains('open');
+  }
+
+  document.addEventListener('keydown', e => { pressedKeys.add(e.code); });
+  document.addEventListener('keyup',   e => { pressedKeys.delete(e.code); });
+
   /* ============ GAMEPAD ============ */
   function scaleAxis(raw, offset) {
     if (raw === offset) return 0;
@@ -1360,10 +1836,6 @@
           offsetY        = gp.axes[bindings.axisY]        || 0;
           offsetYaw      = gp.axes[bindings.axisYaw]      || 0;
           offsetThrottle = gp.axes[bindings.axisThrottle] || 0;
-          const connEl = document.getElementById('conn');
-          if (connEl) {
-            connEl.innerText = 'CALIBRATED ZERO'; connEl.style.color = '#facc15';
-          }
         }
         btn8WasPressed = calibBtn;
 
@@ -1381,11 +1853,11 @@
         // Hat Y-axis: switch speed mode and restore that mode's stored gains
         if (hatY === 1  && prevHatY !== 1)  {
           speedMode = 'fast';
-          surgeGain = modeGains.fast.surge; swayGain = modeGains.fast.sway; yawGain = modeGains.fast.yaw;
+          surgeGain = modeGains.fast.surge; swayGain = modeGains.fast.sway; yawGain = modeGains.fast.yaw; diagonalGain = modeGains.fast.diagonal;
         }
         if (hatY === -1 && prevHatY !== -1) {
           speedMode = 'slow';
-          surgeGain = modeGains.slow.surge; swayGain = modeGains.slow.sway; yawGain = modeGains.slow.yaw;
+          surgeGain = modeGains.slow.surge; swayGain = modeGains.slow.sway; yawGain = modeGains.slow.yaw; diagonalGain = modeGains.slow.diagonal;
         }
         // Hat X-axis: vertical gain fine-tune (right=1 → +5%, left=-1 → −5%)
         if (hatX === 1  && prevHatX !== 1)  verticalGain = Math.min(1.0, Math.round((verticalGain + gainStep) * 100) / 100);
@@ -1406,24 +1878,32 @@
           surgeGain = swayGain = Math.max(0.05, Math.round((surgeGain - gainStep) * 100) / 100);
           modeGains[speedMode].surge = modeGains[speedMode].sway = surgeGain;
         }
-        // Btn 5/3: yaw only, persisted to active mode store
+        // Btn 5/3: yaw + diagonal together, persisted to active mode store
         if (vgUp && !vgUpWas) {
-          yawGain = Math.min(1.0, Math.round((yawGain + gainStep) * 100) / 100);
+          yawGain      = Math.min(1.0, Math.round((yawGain      + gainStep) * 100) / 100);
+          diagonalGain = Math.min(1.0, Math.round((diagonalGain + gainStep) * 100) / 100);
           modeGains[speedMode].yaw = yawGain;
+          modeGains[speedMode].diagonal = diagonalGain;
         }
         if (vgDown && !vgDownWas) {
-          yawGain = Math.max(0.05, Math.round((yawGain - gainStep) * 100) / 100);
+          yawGain      = Math.max(0.05, Math.round((yawGain      - gainStep) * 100) / 100);
+          diagonalGain = Math.max(0.05, Math.round((diagonalGain - gainStep) * 100) / 100);
           modeGains[speedMode].yaw = yawGain;
+          modeGains[speedMode].diagonal = diagonalGain;
         }
         gainUpWas = gainUp; gainDownWas = gainDown; vgUpWas = vgUp; vgDownWas = vgDown;
 
-        const bp = key => bindings[key] >= 0 && !!gp.buttons[bindings[key]]?.pressed;
+        const bp = key => {
+          const val = bindings[key];
+          if (isKeyBinding(val)) return !isSettingsOpen() && pressedKeys.has(val.slice(4));
+          return val >= 0 && !!gp.buttons[val]?.pressed;
+        };
 
-        const bDepth=bp('btnDepthHold'), bRollH=bp('btnRollHold'), bStab=bp('btnStabilize');
+        const bDepth=bp('btnDepthHold'), bRollH=bp('btnRollHold'), bYawH=bp('btnYawHold');
         if (bDepth && !depthHoldWas) setHoldMode('depth');
         if (bRollH && !rollHoldWas)  setHoldMode('roll');
-        if (bStab  && !stabilizeWas) setHoldMode('stabilize');
-        depthHoldWas=bDepth; rollHoldWas=bRollH; stabilizeWas=bStab;
+        if (bYawH  && !yawHoldWas) setHoldMode('yaw');
+        depthHoldWas=bDepth; rollHoldWas=bRollH; yawHoldWas=bYawH;
 
         const bDepthUp=bp('btnDepthUp'), bDepthDown=bp('btnDepthDown');
         if (depthHoldActive) {
@@ -1431,6 +1911,13 @@
           if (bDepthDown && !depthDownWas) depthHoldTarget = Math.round((depthHoldTarget - depthHoldStep) * 1000) / 1000;
         }
         depthUpWas = bDepthUp; depthDownWas = bDepthDown;
+
+        const bYawCW=bp('btnYawStepCW'), bYawCCW=bp('btnYawStepCCW');
+        if (yawHoldActive) {
+          if (bYawCW  && !yawStepCWWas)  yawHoldTarget = Math.round((yawHoldTarget + yawHoldStep) * 10) / 10;
+          if (bYawCCW && !yawStepCCWWas) yawHoldTarget = Math.round((yawHoldTarget - yawHoldStep) * 10) / 10;
+        }
+        yawStepCWWas = bYawCW; yawStepCCWWas = bYawCCW;
 
         const bArmBtn=bp('btnArm'), bDisarmBtn=bp('btnDisarm');
         if (bArmBtn    && !armBtnWas)    setArmed(true);
@@ -1452,15 +1939,29 @@
         arm1Rot1100Was=bA1R1100; arm1Rot1900Was=bA1R1900;
         arm2Rot1100Was=bA2R1100; arm2Rot1900Was=bA2R1900;
 
+
+        const bL1=bp('btnLight1'), bL2=bp('btnLight2'), bL3=bp('btnLight3'), bL4=bp('btnLight4');
+        if (bL1 && !light1Was) toggleLight(1);
+        if (bL2 && !light2Was) toggleLight(2);
+        if (bL3 && !light3Was) toggleLight(3);
+        if (bL4 && !light4Was) toggleLight(4);
+        light1Was=bL1; light2Was=bL2; light3Was=bL3; light4Was=bL4;
+
         let surge = 0, sway = 0, pitch = 0, roll = 0, yaw = 0;
         if (trigger) {
           pitch = applyInvert(raw_y * surgeGain, 'pitch');
           roll  = applyInvert(raw_x * rollGain, 'roll');
           yaw   = applyInvert(raw_yaw * yawGain, 'yaw');
         } else {
-          surge = applyInvert(raw_y * surgeGain, 'surge');
-          sway  = applyInvert(raw_x * swayGain, 'sway');
-          yaw   = applyInvert(raw_yaw * yawGain, 'yaw');
+          let surge_eff = raw_y * surgeGain;
+          let sway_eff  = raw_x * swayGain;
+          const yaw_eff = raw_yaw * yawGain;
+          const l1 = Math.abs(surge_eff) + Math.abs(sway_eff);
+          const diagRemaining = Math.max(0, diagonalGain - Math.abs(yaw_eff));
+          if (l1 > diagRemaining) { const s = diagRemaining / l1; surge_eff *= s; sway_eff *= s; }
+          surge = applyInvert(surge_eff, 'surge');
+          sway  = applyInvert(sway_eff, 'sway');
+          yaw   = applyInvert(yaw_eff, 'yaw');
         }
 
         nx = clamp(sway, -1, 1);
@@ -1471,12 +1972,19 @@
         currentRoll  = clamp(roll, -1, 1);
 
         if (depthHoldActive) {
-          const dDir = axisInvert.depthHoldDir ? -1 : 1;
-          depthCorrection = clamp((depthHoldTarget - latestDepth) * DEPTH_HOLD_KP, -1, 1) * dDir;
+          const error = depthHoldTarget - latestDepth;
+          depthIntegral = clamp(depthIntegral + error * 0.02, -0.5, 0.5);
+          depthCorrection = clamp(error * DEPTH_HOLD_KP + depthIntegral * DEPTH_HOLD_KI, -1, 1);
         }
         if (rollHoldActive) {
           const rDir = axisInvert.rollHoldDir ? -1 : 1;
           rollCorrection = clamp((0 - latestRollDeg) * ROLL_HOLD_KP, -1, 1) * rDir;
+        }
+        if (yawHoldActive) {
+          const yDir = axisInvert.yawHoldDir ? -1 : 1;
+          const error = yawHoldTarget - latestYawDeg;
+          yawHoldIntegral = clamp(yawHoldIntegral + error * 0.02, -30, 30);
+          yawHoldCorrection = clamp(error * YAW_HOLD_KP + yawHoldIntegral * YAW_HOLD_KI, -1, 1) * yDir;
         }
 
         updateThrusters();
@@ -1490,6 +1998,37 @@
         nx = 0; ny = 0; yawNorm = 0; verticalNorm = 0; currentPitch = 0; currentRoll = 0;
         updateThrusters();
         emitJoystick();
+      }
+      // Keyboard-bound buttons still fire without a gamepad
+      if (remapTarget === null && pressedKeys.size > 0 && !isSettingsOpen()) {
+        const kbp = key => { const v = bindings[key]; return isKeyBinding(v) && pressedKeys.has(v.slice(4)); };
+        const bDepth=kbp('btnDepthHold'), bRollH=kbp('btnRollHold'), bYawH=kbp('btnYawHold');
+        if (bDepth && !depthHoldWas) setHoldMode('depth');
+        if (bRollH && !rollHoldWas)  setHoldMode('roll');
+        if (bYawH  && !yawHoldWas)   setHoldMode('yaw');
+        depthHoldWas=bDepth; rollHoldWas=bRollH; yawHoldWas=bYawH;
+        const bDepthUp=kbp('btnDepthUp'), bDepthDown=kbp('btnDepthDown');
+        if (depthHoldActive) {
+          if (bDepthUp   && !depthUpWas)   depthHoldTarget = Math.round((depthHoldTarget + depthHoldStep) * 1000) / 1000;
+          if (bDepthDown && !depthDownWas) depthHoldTarget = Math.round((depthHoldTarget - depthHoldStep) * 1000) / 1000;
+        }
+        depthUpWas=bDepthUp; depthDownWas=bDepthDown;
+        const bYawCW=kbp('btnYawStepCW'), bYawCCW=kbp('btnYawStepCCW');
+        if (yawHoldActive) {
+          if (bYawCW  && !yawStepCWWas)  yawHoldTarget = Math.round((yawHoldTarget + yawHoldStep) * 10) / 10;
+          if (bYawCCW && !yawStepCCWWas) yawHoldTarget = Math.round((yawHoldTarget - yawHoldStep) * 10) / 10;
+        }
+        yawStepCWWas=bYawCW; yawStepCCWWas=bYawCCW;
+        const bArmBtn=kbp('btnArm'), bDisarmBtn=kbp('btnDisarm');
+        if (bArmBtn    && !armBtnWas)    setArmed(true);
+        if (bDisarmBtn && !disarmBtnWas) setArmed(false);
+        armBtnWas=bArmBtn; disarmBtnWas=bDisarmBtn;
+        const bL1=kbp('btnLight1'), bL2=kbp('btnLight2'), bL3=kbp('btnLight3'), bL4=kbp('btnLight4');
+        if (bL1 && !light1Was) toggleLight(1);
+        if (bL2 && !light2Was) toggleLight(2);
+        if (bL3 && !light3Was) toggleLight(3);
+        if (bL4 && !light4Was) toggleLight(4);
+        light1Was=bL1; light2Was=bL2; light3Was=bL3; light4Was=bL4;
       }
     }
     // --- DualSense arm controller ---
@@ -1514,44 +2053,92 @@
         const slowMode = !!armGp.buttons[armBindings.btnSlowMode]?.pressed;
         const fastMode = !!armGp.buttons[armBindings.btnFastMode]?.pressed;
         const armGain  = slowMode ? ARM_SLOW_GAIN : fastMode ? ARM_FAST_GAIN : ARM_NORMAL_GAIN;
+        const armTag = document.getElementById('armModeTag');
+        if (armTag) {
+          if (slowMode)      { armTag.textContent = 'SLOW MODE';   armTag.style.borderColor = '#22c55e'; armTag.style.color = '#22c55e'; armTag.style.background = 'rgba(34,197,94,0.1)'; }
+          else if (fastMode) { armTag.textContent = 'FAST MODE';   armTag.style.borderColor = '#f59e0b'; armTag.style.color = '#f59e0b'; armTag.style.background = 'rgba(245,158,11,0.1)'; }
+          else               { armTag.textContent = 'NORMAL MODE'; armTag.style.borderColor = '#c4b5fd'; armTag.style.color = '#c4b5fd'; armTag.style.background = 'rgba(196,181,253,0.1)'; }
+        }
         const armDz = v => Math.abs(v) < 0.05 ? 0 : v;
-        const axPwm = v => Math.max(1000, Math.min(2000, Math.round(1500 + armDz(v) * armGain * 500)));
+        const axPwm = (v, ch) => clamp(Math.round(1500 + armDz(v) * armGain * 500), armRange[ch].min, armRange[ch].max);
 
         const setArmSlider = (id, pwm) => {
           const el = document.getElementById(id);
           if (el) { el.value = pwm; updateArmValue(id); }
         };
 
-        setArmSlider('arm2_slew',     axPwm(armGp.axes[armBindings.axisLeftX]  || 0));
-        setArmSlider('arm2_shoulder', axPwm(armGp.axes[armBindings.axisLeftY]  || 0));
-        setArmSlider('arm1_slew',     axPwm(armGp.axes[armBindings.axisRightX] || 0));
-        setArmSlider('arm1_shoulder', axPwm(armGp.axes[armBindings.axisRightY] || 0));
+        setArmSlider('arm2_slew',     axPwm(armGp.axes[armBindings.axisLeftX]  || 0, 'arm2_slew'));
+        setArmSlider('arm2_shoulder', axPwm(armGp.axes[armBindings.axisLeftY]  || 0, 'arm2_shoulder'));
+        setArmSlider('arm1_slew',     axPwm(armGp.axes[armBindings.axisRightX] || 0, 'arm1_slew'));
+        setArmSlider('arm1_shoulder', axPwm(armGp.axes[armBindings.axisRightY] || 0, 'arm1_shoulder'));
+        if (armBindings.axisArm1Gripper >= 0) { const gv1 = armGp.axes[armBindings.axisArm1Gripper] || 0; setArmSlider('arm1_gripper', clamp(Math.round(1500 + armDz(gv1) * armGain * 500), 1000, 2000)); }
+        if (armBindings.axisArm2Gripper >= 0) { const gv2 = armGp.axes[armBindings.axisArm2Gripper] || 0; setArmSlider('arm2_gripper', clamp(Math.round(1500 + armDz(gv2) * armGain * 500), 1000, 2000)); }
+        const abpa = key => {
+          const val = armBindings[key];
+          if (isKeyBinding(val)) return !isSettingsOpen() && pressedKeys.has(val.slice(4));
+          return val >= 0 && !!armGp.buttons[val]?.pressed;
+        };
+        const bG1_1100=abpa('btnArm1Gripper1100'), bG1_1900=abpa('btnArm1Gripper1900');
+        const bG2_1100=abpa('btnArm2Gripper1100'), bG2_1900=abpa('btnArm2Gripper1900');
+        if (bG1_1100 && !arm1Grip1100Was) { document.getElementById('arm1_gripper').value = gripperPwm.arm1_open;  updateArmValue('arm1_gripper'); emitArmControls(); }
+        if (!bG1_1100 && arm1Grip1100Was) { document.getElementById('arm1_gripper').value = 1500; updateArmValue('arm1_gripper'); emitArmControls(); }
+        if (bG1_1900 && !arm1Grip1900Was) { document.getElementById('arm1_gripper').value = gripperPwm.arm1_close; updateArmValue('arm1_gripper'); emitArmControls(); }
+        if (!bG1_1900 && arm1Grip1900Was) { document.getElementById('arm1_gripper').value = 1500; updateArmValue('arm1_gripper'); emitArmControls(); }
+        if (bG2_1100 && !arm2Grip1100Was) { document.getElementById('arm2_gripper').value = gripperPwm.arm2_open;  updateArmValue('arm2_gripper'); emitArmControls(); }
+        if (!bG2_1100 && arm2Grip1100Was) { document.getElementById('arm2_gripper').value = 1500; updateArmValue('arm2_gripper'); emitArmControls(); }
+        if (bG2_1900 && !arm2Grip1900Was) { document.getElementById('arm2_gripper').value = gripperPwm.arm2_close; updateArmValue('arm2_gripper'); emitArmControls(); }
+        if (!bG2_1900 && arm2Grip1900Was) { document.getElementById('arm2_gripper').value = 1500; updateArmValue('arm2_gripper'); emitArmControls(); }
+        arm1Grip1100Was=bG1_1100; arm1Grip1900Was=bG1_1900;
+        arm2Grip1100Was=bG2_1100; arm2Grip1900Was=bG2_1900;
+        // Sync button highlights with controller state
+        document.getElementById('arm1_gripper_open') .classList.toggle('active', bG1_1100);
+        document.getElementById('arm1_gripper_close').classList.toggle('active', bG1_1900);
+        document.getElementById('arm2_gripper_open') .classList.toggle('active', bG2_1100);
+        document.getElementById('arm2_gripper_close').classList.toggle('active', bG2_1900);
 
-        // R2-modified: right arm rotate (PWM scales with trigger depth) + gripper
+        // R2-modified: right arm rotate
         const r2Value  = armGp.buttons[armBindings.btnR2Mod]?.value ?? 0;
         const r2Held   = r2Value > 0.05;
         const rotCCW   = r2Held && !!armGp.buttons[armBindings.btnArm1RotateCCW]?.pressed;
         const rotCW    = r2Held && !!armGp.buttons[armBindings.btnArm1RotateCW]?.pressed;
         const arm1RotPwm = rotCCW ? Math.round(1500 - r2Value * 500)
                          : rotCW  ? Math.round(1500 + r2Value * 500) : 1500;
-        setArmSlider('arm1_rotate', Math.max(1000, Math.min(2000, arm1RotPwm)));
+        setArmSlider('arm1_rotate', clamp(arm1RotPwm, armRange['arm1_rotate'].min, armRange['arm1_rotate'].max));
 
-        const gripOpen  = r2Held && !!armGp.buttons[armBindings.btnArm1GripperOpen]?.pressed;
-        const gripClose = r2Held && !!armGp.buttons[armBindings.btnArm1GripperClose]?.pressed;
-        arm1_gripper_state = gripOpen ? 2 : gripClose ? 1 : 0;
-
-        // L2-modified: left arm rotate (PWM scales with trigger depth) + gripper
+        // L2-modified: left arm rotate
         const l2Value  = armGp.buttons[armBindings.btnL2Mod]?.value ?? 0;
         const l2Held   = l2Value > 0.05;
         const l2RotCCW = l2Held && !!armGp.buttons[armBindings.btnArm2RotateCCW]?.pressed;
         const l2RotCW  = l2Held && !!armGp.buttons[armBindings.btnArm2RotateCW]?.pressed;
         const arm2RotPwm = l2RotCCW ? Math.round(1500 - l2Value * 500)
                          : l2RotCW  ? Math.round(1500 + l2Value * 500) : 1500;
-        setArmSlider('arm2_rotate', Math.max(1000, Math.min(2000, arm2RotPwm)));
+        setArmSlider('arm2_rotate', clamp(arm2RotPwm, armRange['arm2_rotate'].min, armRange['arm2_rotate'].max));
 
-        const l2GripOpen  = l2Held && !!armGp.buttons[armBindings.btnArm2GripperOpen]?.pressed;
-        const l2GripClose = l2Held && !!armGp.buttons[armBindings.btnArm2GripperClose]?.pressed;
-        arm2_gripper_state = l2GripOpen ? 2 : l2GripClose ? 1 : 0;
+        // Camera zoom control
+        const bCamSel     = armBindings.btnCamSelect  >= 0 && !!armGp.buttons[armBindings.btnCamSelect]?.pressed;
+        const bCamZoomIn  = armBindings.btnCamZoomIn  >= 0 && !!armGp.buttons[armBindings.btnCamZoomIn]?.pressed;
+        const bCamZoomOut = armBindings.btnCamZoomOut >= 0 && !!armGp.buttons[armBindings.btnCamZoomOut]?.pressed;
+        if (bCamSel && !optionsBtnWas) {
+          const CW_CAMS = [2, 3, 5, 4];
+          selectedCam = CW_CAMS[(CW_CAMS.indexOf(selectedCam) + 1) % CW_CAMS.length];
+          emitCamZoomState();
+        }
+        if (bCamZoomIn && !camZoomInWas && selectedCam > 0) {
+          camZooms[selectedCam - 1] = Math.min(5.0, Math.round((camZooms[selectedCam - 1] + camZoomStep) * 1000) / 1000);
+          emitCamZoomState();
+        }
+        if (bCamZoomOut && !camZoomOutWas && selectedCam > 0) {
+          camZooms[selectedCam - 1] = Math.max(1.0, Math.round((camZooms[selectedCam - 1] - camZoomStep) * 1000) / 1000);
+          emitCamZoomState();
+        }
+        const bPromoteCam = armBindings.btnPromoteCam >= 0 && !!armGp.buttons[armBindings.btnPromoteCam]?.pressed;
+        if (bPromoteCam && !promoteCamWas && selectedCam > 0) {
+          socket.emit('promote-cam', { cam: selectedCam });
+        }
+        optionsBtnWas = bCamSel;
+        camZoomInWas  = bCamZoomIn;
+        camZoomOutWas = bCamZoomOut;
+        promoteCamWas = bPromoteCam;
 
         emitArmControls();
       }
@@ -1562,30 +2149,121 @@
 
   let pollRunning = false;
   let lastGpSeen  = Date.now();
-  window.addEventListener('gamepadconnected', (e) => {
-    const id = e.gamepad.id.toLowerCase();
-    if (id.includes('dualsense') || (id.includes('054c') && id.includes('0ce6'))) {
-      gpArmIndex = e.gamepad.index;
-    } else {
-      gpIndex = e.gamepad.index;
+
+  // Start polling immediately so keyboard bindings work even before a gamepad connects
+  pollRunning = true;
+  requestAnimationFrame(pollGamepad);
+
+  function isSonyPad(id) {
+    // Match DualSense/DualShock by name or Sony vendor ID (054c).
+    // Chrome on Linux reports USB gamepads with the vendor ID in the string,
+    // e.g. "DualSense Wireless Controller (Vendor: 054c Product: 0ce6)"
+    return id.includes('dualsense') || id.includes('dual sense') ||
+           id.includes('054c')      || id.includes('0ce6')       ||
+           id.includes('wireless controller');
+  }
+
+  function autoAssignPad(pad) {
+    if (gpFlightOverride !== null && gpArmOverride !== null) return; // fully manual
+    const id = pad.id.toLowerCase();
+    if (gpArmOverride === null && isSonyPad(id)) {
+      gpArmIndex = pad.index;
+    } else if (gpFlightOverride === null && !isSonyPad(id)) {
+      gpIndex = pad.index;
+    } else if (gpArmOverride === null) {
+      // Fallback: first unassigned pad → arm if arm slot empty
+      if (gpArmIndex === null) gpArmIndex = pad.index;
     }
+  }
+
+  window.addEventListener('gamepadconnected', (e) => {
+    if (gpFlightOverride !== null) gpIndex    = gpFlightOverride;
+    if (gpArmOverride    !== null) gpArmIndex = gpArmOverride;
+    autoAssignPad(e.gamepad);
+    refreshGamepadList();
     if (!pollRunning) { pollRunning = true; requestAnimationFrame(pollGamepad); }
   });
 
-  /* ============ ARM ============ */
-  let arm1_gripper_state = 0;
-  let arm2_gripper_state = 0;
+  window.addEventListener('gamepaddisconnected', (e) => {
+    if (e.gamepad.index === gpIndex    && gpFlightOverride === null) gpIndex    = null;
+    if (e.gamepad.index === gpArmIndex && gpArmOverride    === null) gpArmIndex = null;
+    refreshGamepadList();
+  });
 
+  // Periodic scan: catches gamepads that connected before the page loaded,
+  // or where gamepadconnected didn't fire (can happen with some USB drivers on Linux).
+  setInterval(() => {
+    const pads = [...(navigator.getGamepads ? navigator.getGamepads() : [])].filter(Boolean);
+    let changed = false;
+    for (const pad of pads) {
+      if (pad.index === gpIndex || pad.index === gpArmIndex) continue;
+      autoAssignPad(pad);
+      changed = true;
+    }
+    if (changed) refreshGamepadList();
+  }, 1000);
+
+  function refreshGamepadList() {
+    const listEl = document.getElementById('gp-list');
+    if (!listEl) return;
+    const pads = [...(navigator.getGamepads ? navigator.getGamepads() : [])].filter(Boolean);
+    if (pads.length === 0) {
+      listEl.innerHTML = '<p style="font-size:12px;color:var(--s1)">No gamepads detected. Connect a controller and press a button.</p>';
+    } else {
+      listEl.innerHTML = pads.map(p => `
+        <div style="margin:6px 0;padding:8px;border:1px solid var(--p);border-radius:4px;font-size:11px">
+          <div style="color:var(--s1);margin-bottom:5px">[${p.index}] ${p.id}</div>
+          <button onclick="setFlightGp(${p.index})" style="background:var(--bg3);color:var(--s);border:1px solid var(--p);padding:3px 10px;border-radius:3px;cursor:pointer;margin-right:6px;font-size:11px">Set as Flight</button>
+          <button onclick="setArmGp(${p.index})"   style="background:var(--bg3);color:var(--s);border:1px solid var(--p);padding:3px 10px;border-radius:3px;cursor:pointer;font-size:11px">Set as Arm</button>
+        </div>`).join('');
+    }
+    updateGpNames();
+  }
+
+  function setFlightGp(idx) {
+    gpFlightOverride = idx; gpIndex = idx;
+    localStorage.setItem('gpFlightOverride', JSON.stringify(idx));
+    updateGpNames();
+    if (!pollRunning) { pollRunning = true; requestAnimationFrame(pollGamepad); }
+  }
+
+  function setArmGp(idx) {
+    gpArmOverride = idx; gpArmIndex = idx;
+    localStorage.setItem('gpArmOverride', JSON.stringify(idx));
+    updateGpNames();
+    if (!pollRunning) { pollRunning = true; requestAnimationFrame(pollGamepad); }
+  }
+
+  function clearGpOverrides() {
+    gpFlightOverride = null; gpArmOverride = null;
+    gpIndex = null; gpArmIndex = null;
+    localStorage.removeItem('gpFlightOverride');
+    localStorage.removeItem('gpArmOverride');
+    updateGpNames();
+  }
+
+  function updateGpNames() {
+    const pads = [...(navigator.getGamepads ? navigator.getGamepads() : [])].filter(Boolean);
+    const find = idx => idx !== null ? (pads.find(p => p.index === idx)?.id ?? `#${idx} (disconnected)`) : null;
+    const fn = document.getElementById('gp-flight-name');
+    const an = document.getElementById('gp-arm-name');
+    if (fn) fn.textContent = find(gpIndex)    ?? (gpFlightOverride !== null ? `#${gpFlightOverride} (disconnected)` : 'Auto / None');
+    if (an) an.textContent = find(gpArmIndex) ?? (gpArmOverride    !== null ? `#${gpArmOverride} (disconnected)`    : 'Auto / None');
+  }
+
+  /* ============ ARM ============ */
   function armPayload() {
+    const ca = (val, ch) => clamp(val, armRange[ch].min, armRange[ch].max);
+    const gv = id => Number(document.getElementById(id).value);
     return {
-      arm1_slew:     applyInvertPwm(Number(document.getElementById('arm1_slew').value),     'arm1Slew'),
-      arm1_shoulder: applyInvertPwm(Number(document.getElementById('arm1_shoulder').value), 'arm1Shoulder'),
-      arm1_rotate:   applyInvertPwm(Number(document.getElementById('arm1_rotate').value),   'arm1Rotate'),
-      arm1_gripper:  applyInvertGripper(arm1_gripper_state, 'arm1Gripper'),
-      arm2_slew:     applyInvertPwm(Number(document.getElementById('arm2_slew').value),     'arm2Slew'),
-      arm2_shoulder: applyInvertPwm(Number(document.getElementById('arm2_shoulder').value), 'arm2Shoulder'),
-      arm2_rotate:   applyInvertPwm(Number(document.getElementById('arm2_rotate').value),   'arm2Rotate'),
-      arm2_gripper:  applyInvertGripper(arm2_gripper_state, 'arm2Gripper'),
+      arm1_slew:     ca(applyInvertPwm(gv('arm1_slew'),     'arm1Slew'),     'arm1_slew'),
+      arm1_shoulder: ca(applyInvertPwm(gv('arm1_shoulder'), 'arm1Shoulder'), 'arm1_shoulder'),
+      arm1_rotate:   ca(applyInvertPwm(gv('arm1_rotate'),   'arm1Rotate'),   'arm1_rotate'),
+      arm1_gripper:  applyInvertPwm(gv('arm1_gripper'), 'arm1Gripper'),
+      arm2_slew:     ca(applyInvertPwm(gv('arm2_slew'),     'arm2Slew'),     'arm2_slew'),
+      arm2_shoulder: ca(applyInvertPwm(gv('arm2_shoulder'), 'arm2Shoulder'), 'arm2_shoulder'),
+      arm2_rotate:   ca(applyInvertPwm(gv('arm2_rotate'),   'arm2Rotate'),   'arm2_rotate'),
+      arm2_gripper:  applyInvertPwm(gv('arm2_gripper'), 'arm2Gripper'),
     };
   }
 
@@ -1595,10 +2273,37 @@
 
   function emitArmControls() { socket.emit('arm-control', armPayload()); }
 
-  ['arm1_slew','arm1_shoulder','arm1_rotate','arm2_slew','arm2_shoulder','arm2_rotate'].forEach(id => {
+  let _armSliderInterval = null;
+  ['arm1_slew','arm1_shoulder','arm1_rotate',
+   'arm2_slew','arm2_shoulder','arm2_rotate'].forEach(id => {
     const el = document.getElementById(id);
-    el.addEventListener('input', () => { updateArmValue(id); emitArmControls(); });
+    el.addEventListener('input',  () => { updateArmValue(id); emitArmControls(); });
     el.addEventListener('change', () => { el.value = 1500; updateArmValue(id); emitArmControls(); });
+    el.addEventListener('pointerdown', () => { _armSliderInterval = setInterval(emitArmControls, 50); });
+  });
+  document.addEventListener('pointerup', () => { clearInterval(_armSliderInterval); _armSliderInterval = null; });
+
+  // Gripper open/close buttons — press and hold, release returns to neutral
+  [
+    { openId: 'arm1_gripper_open', closeId: 'arm1_gripper_close', hiddenId: 'arm1_gripper', armKey: 'arm1' },
+    { openId: 'arm2_gripper_open', closeId: 'arm2_gripper_close', hiddenId: 'arm2_gripper', armKey: 'arm2' },
+  ].forEach(({ openId, closeId, hiddenId, armKey }) => {
+    const hidden = document.getElementById(hiddenId);
+    const setG = (pwm) => { hidden.value = pwm; updateArmValue(hiddenId); emitArmControls(); };
+    const openBtn  = document.getElementById(openId);
+    const closeBtn = document.getElementById(closeId);
+    const activate = (btn) => { openBtn.classList.remove('active'); closeBtn.classList.remove('active'); btn.classList.add('active'); };
+    const resetG   = () => { openBtn.classList.remove('active'); closeBtn.classList.remove('active'); setG(1500); };
+    openBtn.addEventListener('mousedown',   () => { activate(openBtn);  setG(gripperPwm[`${armKey}_open`]); });
+    openBtn.addEventListener('mouseup',     resetG);
+    openBtn.addEventListener('mouseleave',  resetG);
+    openBtn.addEventListener('touchstart',  (e) => { e.preventDefault(); activate(openBtn);  setG(gripperPwm[`${armKey}_open`]); });
+    openBtn.addEventListener('touchend',    resetG);
+    closeBtn.addEventListener('mousedown',  () => { activate(closeBtn); setG(gripperPwm[`${armKey}_close`]); });
+    closeBtn.addEventListener('mouseup',    resetG);
+    closeBtn.addEventListener('mouseleave', resetG);
+    closeBtn.addEventListener('touchstart', (e) => { e.preventDefault(); activate(closeBtn); setG(gripperPwm[`${armKey}_close`]); });
+    closeBtn.addEventListener('touchend',   resetG);
   });
 
   const rotatePwmButtons = [
@@ -1608,66 +2313,19 @@
     { id: 'arm2_rotate_1900', sliderId: 'arm2_rotate', pwm: 1900 },
   ];
   rotatePwmButtons.forEach(({ id, sliderId, pwm }) => {
-    const btn = document.getElementById(id);
+    const btn    = document.getElementById(id);
     const slider = document.getElementById(sliderId);
-    const reset = () => { slider.value = 1500; updateArmValue(sliderId); emitArmControls(); };
-    btn.addEventListener('mousedown', () => { slider.value = pwm; updateArmValue(sliderId); emitArmControls(); });
+    const reset  = () => { slider.value = 1500; updateArmValue(sliderId); emitArmControls(); };
+    btn.addEventListener('mousedown',  () => { slider.value = clamp(pwm, armRange[sliderId].min, armRange[sliderId].max); updateArmValue(sliderId); emitArmControls(); });
     btn.addEventListener('mouseup',    reset);
     btn.addEventListener('mouseleave', reset);
   });
 
-  const gripperButtons = {
-    arm1_gripper_close: { state: 1, arm: 'arm1' },
-    arm1_gripper_open:  { state: 2, arm: 'arm1' },
-    arm2_gripper_close: { state: 1, arm: 'arm2' },
-    arm2_gripper_open:  { state: 2, arm: 'arm2' },
-  };
 
-  for (const [id, { state, arm }] of Object.entries(gripperButtons)) {
-    const button = document.getElementById(id);
-    button.addEventListener('mousedown', () => {
-      if (arm === 'arm1') arm1_gripper_state = state;
-      else arm2_gripper_state = state;
-      emitArmControls();
-    });
-    button.addEventListener('mouseup', () => {
-      if (arm === 'arm1' && arm1_gripper_state === state) arm1_gripper_state = 0;
-      if (arm === 'arm2' && arm2_gripper_state === state) arm2_gripper_state = 0;
-      emitArmControls();
-    });
-    button.addEventListener('mouseleave', () => {
-      if (arm === 'arm1' && arm1_gripper_state === state) { arm1_gripper_state = 0; emitArmControls(); }
-      if (arm === 'arm2' && arm2_gripper_state === state) { arm2_gripper_state = 0; emitArmControls(); }
-    });
-  }
-
-  const gripperKeys = {
-    'h': { state: 1, arm: 'arm1' },
-    'j': { state: 2, arm: 'arm1' },
-    'k': { state: 1, arm: 'arm2' },
-    'l': { state: 2, arm: 'arm2' },
-  };
-
-  window.addEventListener('keydown', (e) => {
-    if (gripperKeys[e.key]) {
-      const { state, arm } = gripperKeys[e.key];
-      if (arm === 'arm1') arm1_gripper_state = state;
-      else arm2_gripper_state = state;
-      emitArmControls();
-    }
-  });
-
-  window.addEventListener('keyup', (e) => {
-    if (gripperKeys[e.key]) {
-      const { state, arm } = gripperKeys[e.key];
-      if (arm === 'arm1' && arm1_gripper_state === state) arm1_gripper_state = 0;
-      if (arm === 'arm2' && arm2_gripper_state === state) arm2_gripper_state = 0;
-      emitArmControls();
-    }
-  });
-
+  for (const ch of Object.keys(DEFAULT_ARM_RANGE)) applyArmSliderRange(ch);
   updateThrusters();
   emitArmControls();
+
 </script>
 </body>
 </html>

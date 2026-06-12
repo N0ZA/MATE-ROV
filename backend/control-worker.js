@@ -9,9 +9,11 @@ const jsState   = new Float32Array(jsBuffer);
 const ctrlState = new Int32Array(ctrlBuffer);
 
 let armData = initialArm;
+let relayData = [0, 0, 0, 0];  // R1-R4, updated independently of arm
 
 parentPort.on('message', msg => {
-  if (msg.type === 'arm') armData = msg.data;
+  if (msg.type === 'arm')   armData   = msg.data;
+  if (msg.type === 'relay') relayData = msg.relays;
 });
 
 const sock = dgram.createSocket('udp4');
@@ -67,22 +69,23 @@ function mixAndSend() {
     ];
   }
 
-  const getGripperValues = state => {
-    if (state === 1) return [0, 1];
-    if (state === 2) return [1, 0];
-    return [0, 0];
-  };
-
+  // Packet: [ESC1-6, MD1(arm1_slew), MD2(arm1_shoulder), MD3(arm1_rotate), MD4(arm1_gripper),
+  //          MD5(arm2_slew), MD6(arm2_shoulder), MD7(arm2_rotate), MD8(arm2_gripper),
+  //          R1, R2, R3, R4]
   const packet = [
     ...thrusters,
     armData.arm1_slew,
     armData.arm1_shoulder,
     armData.arm1_rotate,
-    ...getGripperValues(armData.arm1_gripper),
+    armData.arm1_gripper,   // PWM direct: 1300=open, 1700=close, 1500=neutral
     armData.arm2_slew,
     armData.arm2_shoulder,
     armData.arm2_rotate,
-    ...getGripperValues(armData.arm2_gripper),
+    armData.arm2_gripper,   // PWM direct: 1300=open, 1700=close, 1500=neutral
+    relayData[0],           // R1 — light 1
+    relayData[1],           // R2 — light 2
+    relayData[2],           // R3 — light 3
+    relayData[3],           // R4 — light 4
   ];
 
   sock.send(
