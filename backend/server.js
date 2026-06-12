@@ -304,7 +304,15 @@ function createRtspCam(label, url, clients, camNum) {
       }
       setWatchdog(STREAM_MS); // tighter watchdog now that stream is live
       for (const res of clients) {
-        try { res.write(chunk); } catch { clients.delete(res); }
+        try {
+          res.write(chunk);
+          // Backpressure: if a client (throttled/hidden tab) falls >8MB behind,
+          // drop it so it reconnects fresh instead of lagging minutes behind.
+          if (res.writableLength > 8 * 1024 * 1024) {
+            clients.delete(res);
+            res.destroy();
+          }
+        } catch { clients.delete(res); }
       }
     });
 
@@ -594,6 +602,24 @@ server.listen(3000, ()=>{
 /* ================= CAMERA PAGE (port 3001) ================= */
 const camApp = express();
 camApp.get('/', (req, res) => res.sendFile(join(__dirname, '../frontend', 'camera.html')));
+
+// Serve the /camN streams on 3001 as well. Browsers cap ~6 concurrent
+// HTTP/1.1 connections per host:port, and MJPEG holds one open per feed.
+// Pilot UI strip (4 feeds on :3000) + camera page (4 feeds) exceeded the
+// cap when both pointed at :3000, starving feeds. Splitting them across
+// two ports keeps each page within the per-port budget. The client Sets
+// are shared, so the same GStreamer process fans out to both ports.
+const camRouteSets = { 2: camClients2, 3: camClients3, 4: camClients4, 5: camClients5 };
+for (const [n, clients] of Object.entries(camRouteSets)) {
+  camApp.get(`/cam${n}`, (req, res) => {
+    res.setHeader('Content-Type', 'multipart/x-mixed-replace; boundary=frame');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    clients.add(res);
+    req.on('close', () => clients.delete(res));
+  });
+}
+
 camApp.use(express.static(join(__dirname, '../frontend')));
 const camServer = createServer(camApp);
 camServer.listen(3001, () => console.log('📷 Cameras  → http://localhost:3001'));

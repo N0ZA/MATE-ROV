@@ -206,6 +206,11 @@
 
   <script>
     const host = window.location.hostname;
+    // Streams come from :3001 (this page's own server). The pilot UI strip
+    // uses :3000. Browsers allow only ~6 concurrent connections per
+    // host:port and each MJPEG feed holds one open — splitting the two
+    // pages across ports keeps both under the limit.
+    const CAM_PORT = 3001;
     const CAM_LABELS = { 2: 'CAM 2', 3: 'CAM 3', 4: 'CAM 4', 5: 'CAM 5' };
 
     // slot index → camera number (2–5)
@@ -213,18 +218,37 @@
     let promoted  = false;
 
     function renderSlots() {
+      // Two-phase swap. Changing two imgs' srcs to each other's URLs at the
+      // same time starts new connections before the old identical-URL ones
+      // are torn down — that can momentarily exceed the browser's per-port
+      // connection cap and the over-limit request queues forever (no onerror),
+      // which is why a swapped-out main cam used to die until refresh.
+      // Phase 1: detach every img whose camera changed (aborts old streams).
+      const changed = [];
       for (let s = 0; s < 4; s++) {
-        const cam    = slotToCam[s];
-        const img    = document.getElementById(`img${s}`);
-        const tag    = document.getElementById(`tag${s}`);
-        const newSrc = `http://${host}:3000/cam${cam}`;
-        img.dataset.base = newSrc;
-        if (img.getAttribute('src') !== newSrc) {
+        const cam  = slotToCam[s];
+        const img  = document.getElementById(`img${s}`);
+        const tag  = document.getElementById(`tag${s}`);
+        const base = `http://${host}:${CAM_PORT}/cam${cam}`;
+        if (tag) tag.textContent = CAM_LABELS[cam] || `CAM ${cam}`;
+        if (img.dataset.base !== base) {
+          img.dataset.base = base;
           img.style.display = 'none';
           img.nextElementSibling.style.display = 'flex';
-          img.src = newSrc;
+          img.src = '';            // setting src='' triggers a proper request-abort for MJPEG connections;
+          img.removeAttribute('src'); // then remove the attribute so the error-handler guard sees null
+          changed.push(img);
         }
-        if (tag) tag.textContent = CAM_LABELS[cam] || `CAM ${cam}`;
+      }
+      // Phase 2: attach new URLs after the aborts settle. Cache-buster makes
+      // every request unique so the browser can't reuse or coalesce streams.
+      // 400ms (was 150ms) — MJPEG connections are persistent streams; the browser
+      // needs more time to fully release the connection slot from its per-host pool
+      // before a new request to the same port can go through without being queued.
+      if (changed.length) {
+        setTimeout(() => {
+          for (const img of changed) img.src = img.dataset.base + '?t=' + Date.now();
+        }, 400);
       }
     }
 
@@ -269,25 +293,35 @@
       setTimeout(() => { img.src = base + '?t=' + Date.now(); }, 500);
     }
 
-    // onerror retry — fires when the HTTP connection drops entirely
+    // onerror retry — fires when the HTTP connection drops entirely.
+    // Skip when src was intentionally removed mid-swap (renderSlots phase 1).
     for (let s = 0; s < 4; s++) {
       document.getElementById(`img${s}`).addEventListener('error', function() {
+        if (!this.getAttribute('src')) return;
         setTimeout(() => camReconnect(this), 3000);
       });
     }
 
-    // Canvas watchdog — detects frozen frame even when HTTP stays open
+    // Canvas watchdog — detects frozen frames AND stalled connections.
+    // A request stuck in the browser's connection queue never fires onerror,
+    // so the error-retry above can't see it; this catches it instead.
     ;(function() {
       const cv  = document.createElement('canvas');
       cv.width  = 8; cv.height = 8;
       const ctx = cv.getContext('2d', { willReadFrequently: true });
-      const st  = Array.from({ length: 4 }, () => ({ hash: null, ticks: 0 }));
+      const st  = Array.from({ length: 4 }, () => ({ hash: null, ticks: 0, stall: 0 }));
       setInterval(() => {
         for (let s = 0; s < 4; s++) {
           const img = document.getElementById(`img${s}`);
-          if (!img || !img.src || img.style.display === 'none' || img.naturalWidth === 0) {
-            st[s].hash = null; st[s].ticks = 0; continue;
+          if (!img || !img.src) { st[s].hash = null; st[s].ticks = 0; st[s].stall = 0; continue; }
+          // src is set but nothing has ever arrived → stalled/queued request.
+          // 4 ticks = 20s, generous enough for slow RTSP startup retries.
+          if (img.style.display === 'none' || img.naturalWidth === 0) {
+            st[s].hash = null; st[s].ticks = 0;
+            if (++st[s].stall >= 4) { st[s].stall = 0; camReconnect(img); }
+            continue;
           }
+          st[s].stall = 0;
           let hash;
           try { ctx.drawImage(img, 0, 0, 8, 8); hash = ctx.getImageData(0, 0, 8, 8).data.join(','); }
           catch { continue; }

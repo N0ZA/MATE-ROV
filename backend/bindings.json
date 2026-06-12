@@ -26,7 +26,7 @@
   "btnDisarm": 9,
   "btnLight1": -1,
   "btnLight2": -1,
-  "btnLight3": -1,
-  "btnLight4": -1,
+  "btnLight3": "key:KeyH",
+  "btnLight4": "key:KeyJ",
   "btnStabilize": 1
 }

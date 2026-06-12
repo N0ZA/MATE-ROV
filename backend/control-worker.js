@@ -21,6 +21,34 @@ sock.bind(0);
 
 function clamp(v, min, max) { return Math.max(min, Math.min(max, v)); }
 
+// =====================================================
+// WRIST DIFFERENTIAL (worm-gear coupling)
+// rotate + gripper sit on a shared worm-gear differential.
+//   - Rotating the wrist back-drives the gripper jaws, so to ROTATE while
+//     holding grip the gripper motor must spin complementarily => BOTH motors move.
+//   - Pure OPEN/CLOSE spins ONLY the gripper motor (rotate motor stays at 1500).
+// These are velocity commands (1500 = stop), so we mix in delta-from-1500 space:
+//     rotateMotor  = rotateIntent
+//     gripperMotor = gripperIntent + COUPLE * rotateIntent
+// Tune COUPLE per arm:
+//   magnitude = grip-shaft turns per wrist turn (your gear ratio, ~1.0 for 1:1)
+//   sign      = flip if rotating makes the jaws creep the wrong way
+//   0.0       = disable coupling for that arm (treat motors as independent)
+// =====================================================
+const ARM1_WRIST_COUPLE = -1.0;
+const ARM2_WRIST_COUPLE = -1.0;
+
+function mixWrist(rotatePwm, gripperPwm, couple) {
+  const rotDelta  = rotatePwm  - 1500;
+  const gripDelta = gripperPwm - 1500;
+  const rotateMotor  = 1500 + rotDelta;
+  const gripperMotor = 1500 + gripDelta + couple * rotDelta;
+  return {
+    rotate:  Math.round(clamp(rotateMotor,  1000, 2000)),
+    gripper: Math.round(clamp(gripperMotor, 1000, 2000)),
+  };
+}
+
 function mixAndSend() {
   const armed = Atomics.load(ctrlState, 0);
 
@@ -69,6 +97,11 @@ function mixAndSend() {
     ];
   }
 
+  // Differential mix: convert rotate/gripper INTENT -> the two coupled motor PWMs.
+  // (slew + shoulder are independent single motors, passed through unchanged.)
+  const w1 = mixWrist(armData.arm1_rotate, armData.arm1_gripper, ARM1_WRIST_COUPLE);
+  const w2 = mixWrist(armData.arm2_rotate, armData.arm2_gripper, ARM2_WRIST_COUPLE);
+
   // Packet: [ESC1-6, MD1(arm1_slew), MD2(arm1_shoulder), MD3(arm1_rotate), MD4(arm1_gripper),
   //          MD5(arm2_slew), MD6(arm2_shoulder), MD7(arm2_rotate), MD8(arm2_gripper),
   //          R1, R2, R3, R4]
@@ -76,12 +109,12 @@ function mixAndSend() {
     ...thrusters,
     armData.arm1_slew,
     armData.arm1_shoulder,
-    armData.arm1_rotate,
-    armData.arm1_gripper,   // PWM direct: 1300=open, 1700=close, 1500=neutral
+    w1.rotate,              // MD3: rotate motor (rotate intent)
+    w1.gripper,             // MD4: gripper motor (grip intent + rotate compensation)
     armData.arm2_slew,
     armData.arm2_shoulder,
-    armData.arm2_rotate,
-    armData.arm2_gripper,   // PWM direct: 1300=open, 1700=close, 1500=neutral
+    w2.rotate,              // MD7: rotate motor (rotate intent)
+    w2.gripper,             // MD8: gripper motor (grip intent + rotate compensation)
     relayData[0],           // R1 — light 1
     relayData[1],           // R2 — light 2
     relayData[2],           // R3 — light 3

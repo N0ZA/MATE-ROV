@@ -1104,6 +1104,16 @@
     updateThrusters();
   }
 
+  // Sync arm state from server on (re)connect — keeps UI honest if server restarts
+  socket.on('armed-state', state => {
+    isArmed = !!state;
+    document.getElementById('btn-arm').classList.toggle('active', isArmed);
+    document.getElementById('btn-disarm').classList.toggle('active', !isArmed);
+    document.getElementById('arm-status-label').textContent = isArmed
+      ? 'ARMED — thrusters active'
+      : 'DISARMED — thrusters locked';
+  });
+
   /* ============ LIGHTS ============ */
   const lightStates = { 1: false, 2: false, 3: false, 4: false };
 
@@ -1111,6 +1121,15 @@
     lightStates[index] = !lightStates[index];
     socket.emit('set-relay', { index, state: lightStates[index] });
     document.getElementById(`light-btn-${index}`).classList.toggle('active', lightStates[index]);
+    if (index === 3) {
+      document.getElementById('arm1_gripper').value = lightStates[3] ? 2000 : 1500;
+      updateArmValue('arm1_gripper');
+      emitArmControls();
+    } else if (index === 4) {
+      document.getElementById('arm1_gripper').value = lightStates[4] ? 1000 : 1500;
+      updateArmValue('arm1_gripper');
+      emitArmControls();
+    }
   }
 
   socket.on('relay-state', ({ index, state }) => {
@@ -1869,7 +1888,7 @@
         const vgUp     = bindings.btnVGainUp  >= 0 && !!gp.buttons[bindings.btnVGainUp]?.pressed;
         const vgDown   = bindings.btnVGainDown >= 0 && !!gp.buttons[bindings.btnVGainDown]?.pressed;
 
-        // Btn 4/2: surge+sway together, persisted to active mode store
+        // Btn 4/2: surge+sway only, persisted to active mode store
         if (gainUp && !gainUpWas) {
           surgeGain = swayGain = Math.min(1.0, Math.round((surgeGain + gainStep) * 100) / 100);
           modeGains[speedMode].surge = modeGains[speedMode].sway = surgeGain;
@@ -1957,8 +1976,11 @@
           let sway_eff  = raw_x * swayGain;
           const yaw_eff = raw_yaw * yawGain;
           const l1 = Math.abs(surge_eff) + Math.abs(sway_eff);
-          const diagRemaining = Math.max(0, diagonalGain - Math.abs(yaw_eff));
-          if (l1 > diagRemaining) { const s = diagRemaining / l1; surge_eff *= s; sway_eff *= s; }
+          // diagCap is floored at the larger single-axis value so pure surge or pure sway
+          // is never scaled down — only true diagonal combinations get limited by diagonalGain.
+          const pureMax  = Math.max(Math.abs(surge_eff), Math.abs(sway_eff));
+          const diagCap  = Math.max(pureMax, Math.max(0, diagonalGain - Math.abs(yaw_eff)));
+          if (l1 > diagCap) { const s = diagCap / l1; surge_eff *= s; sway_eff *= s; }
           surge = applyInvert(surge_eff, 'surge');
           sway  = applyInvert(sway_eff, 'sway');
           yaw   = applyInvert(yaw_eff, 'yaw');
@@ -1972,7 +1994,7 @@
         currentRoll  = clamp(roll, -1, 1);
 
         if (depthHoldActive) {
-          const error = depthHoldTarget - latestDepth;
+          const error = latestDepth - depthHoldTarget;
           depthIntegral = clamp(depthIntegral + error * 0.02, -0.5, 0.5);
           depthCorrection = clamp(error * DEPTH_HOLD_KP + depthIntegral * DEPTH_HOLD_KI, -1, 1);
         }
