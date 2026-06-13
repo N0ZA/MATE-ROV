@@ -1,6 +1,6 @@
 import cv2
 
-cap = cv2.VideoCapture('rtsp://admin:admin@192.168.2.12:554')
+cap = cv2.VideoCapture('rtsp://admin:admin@192.168.2.64:554')
 
 if not cap.isOpened():
     print("Error opening RTSP stream. Check IP/port/firewall.")

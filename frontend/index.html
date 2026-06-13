@@ -1160,15 +1160,6 @@
     lightStates[index] = !lightStates[index];
     socket.emit('set-relay', { index, state: lightStates[index] });
     document.getElementById(`light-btn-${index}`).classList.toggle('active', lightStates[index]);
-    if (index === 3) {
-      document.getElementById('arm1_gripper').value = lightStates[3] ? 2000 : 1500;
-      updateArmValue('arm1_gripper');
-      emitArmControls();
-    } else if (index === 4) {
-      document.getElementById('arm1_gripper').value = lightStates[4] ? 1000 : 1500;
-      updateArmValue('arm1_gripper');
-      emitArmControls();
-    }
   }
 
   socket.on('relay-state', ({ index, state }) => {
@@ -1275,18 +1266,18 @@
     axisRightY:         3,  // right arm shoulder (Right Y)
     axisArm1Gripper:   -1,  // right arm gripper axis (unbound)
     axisArm2Gripper:   -1,  // left arm gripper axis (unbound)
-    btnArm1Gripper1100: -1, // right arm gripper 1100 (unbound)
-    btnArm1Gripper1900: -1, // right arm gripper 1900 (unbound)
-    btnArm2Gripper1100: -1, // left arm gripper 1100 (unbound)
-    btnArm2Gripper1900: -1, // left arm gripper 1900 (unbound)
+    btnArm1Gripper1100: 1,  // right arm gripper open  (Circle — hold)
+    btnArm1Gripper1900: 2,  // right arm gripper close (Square  — hold)
+    btnArm2Gripper1100: 0,  // left arm gripper open   (Cross   — hold)
+    btnArm2Gripper1900: 3,  // left arm gripper close  (Triangle — hold)
     btnSlowMode:        4,  // L1
     btnFastMode:        5,  // R1
-    // R2 modifier — right arm rotate + gripper
-    btnR2Mod:           7,  // R2
-    btnArm1RotateCCW:   2,  // Square
-    btnArm1RotateCW:    1,  // Circle
-    // L2 modifier — left arm rotate + gripper
-    btnL2Mod:           6,  // L2
+    // Right arm rotate — hold to spin, release to stop; R2 optional speed modifier
+    btnR2Mod:           7,  // R2 (optional: squeeze for variable speed)
+    btnArm1RotateCCW:  13,  // D-Pad Down
+    btnArm1RotateCW:   12,  // D-Pad Up
+    // Left arm rotate — hold to spin, release to stop; L2 optional speed modifier
+    btnL2Mod:           6,  // L2 (optional: squeeze for variable speed)
     btnArm2RotateCCW:  14,  // D-Pad Left
     btnArm2RotateCW:   15,  // D-Pad Right
     btnCamSelect:        9,  // Options
@@ -1294,7 +1285,14 @@
     btnCamZoomOut:      10,  // L3
     btnPromoteCam:      -1,  // unbound by default
   };
-  let armBindings = { ...DEFAULT_ARM_BINDINGS, ...(JSON.parse(localStorage.getItem('gpArmBindings') || 'null') || {}) };
+  const _savedArm = JSON.parse(localStorage.getItem('gpArmBindings') || 'null') || {};
+  // Migrate: if gripper buttons were never explicitly assigned (old default was -1), apply new defaults
+  ['btnArm1Gripper1100','btnArm1Gripper1900','btnArm2Gripper1100','btnArm2Gripper1900']
+    .forEach(k => { if (_savedArm[k] === -1) delete _savedArm[k]; });
+  // Migrate: rotate buttons moved off Circle(1)/Square(2) to D-pad to avoid gripper conflict
+  if (_savedArm.btnArm1RotateCCW === 2)  delete _savedArm.btnArm1RotateCCW;
+  if (_savedArm.btnArm1RotateCW  === 1)  delete _savedArm.btnArm1RotateCW;
+  let armBindings = { ...DEFAULT_ARM_BINDINGS, ..._savedArm };
   function saveArmBindings() { localStorage.setItem('gpArmBindings', JSON.stringify(armBindings)); }
 
   function emitCamZoomState() {
@@ -2123,8 +2121,13 @@
         const bL1=bp('btnLight1'), bL2=bp('btnLight2'), bL3=bp('btnLight3'), bL4=bp('btnLight4');
         if (bL1 && !light1Was) toggleLight(1);
         if (bL2 && !light2Was) toggleLight(2);
-        if (bL3 && !light3Was) toggleLight(3);
-        if (bL4 && !light4Was) toggleLight(4);
+        // bL3/bL4: arm1 rotate hold (CW / CCW). When arm controller absent, drive rotate directly.
+        if (!armGp) {
+          const arm1RotEl = document.getElementById('arm1_rotate');
+          if (bL3 && !bL4)                          { arm1RotEl.value = armRange['arm1_rotate'].max; updateArmValue('arm1_rotate'); emitArmControls(); }
+          else if (bL4 && !bL3)                     { arm1RotEl.value = armRange['arm1_rotate'].min; updateArmValue('arm1_rotate'); emitArmControls(); }
+          else if ((light3Was || light4Was) && !bL3 && !bL4) { arm1RotEl.value = 1500; updateArmValue('arm1_rotate'); emitArmControls(); }
+        }
         light1Was=bL1; light2Was=bL2; light3Was=bL3; light4Was=bL4;
 
         let surge = 0, sway = 0, pitch = 0, roll = 0, yaw = 0;
@@ -2217,8 +2220,13 @@
         const bL1=kbp('btnLight1'), bL2=kbp('btnLight2'), bL3=kbp('btnLight3'), bL4=kbp('btnLight4');
         if (bL1 && !light1Was) toggleLight(1);
         if (bL2 && !light2Was) toggleLight(2);
-        if (bL3 && !light3Was) toggleLight(3);
-        if (bL4 && !light4Was) toggleLight(4);
+        // bL3/bL4: arm1 rotate hold (CW / CCW). When arm controller absent, drive rotate directly.
+        if (!armGp) {
+          const arm1RotEl = document.getElementById('arm1_rotate');
+          if (bL3 && !bL4)                          { arm1RotEl.value = armRange['arm1_rotate'].max; updateArmValue('arm1_rotate'); emitArmControls(); }
+          else if (bL4 && !bL3)                     { arm1RotEl.value = armRange['arm1_rotate'].min; updateArmValue('arm1_rotate'); emitArmControls(); }
+          else if ((light3Was || light4Was) && !bL3 && !bL4) { arm1RotEl.value = 1500; updateArmValue('arm1_rotate'); emitArmControls(); }
+        }
         light1Was=bL1; light2Was=bL2; light3Was=bL3; light4Was=bL4;
       }
     }
@@ -2266,22 +2274,27 @@
         document.getElementById('arm2_gripper_open') .classList.toggle('active', bG2_1100);
         document.getElementById('arm2_gripper_close').classList.toggle('active', bG2_1900);
 
-        // R2-modified: right arm rotate
+        // Right arm rotate: hold direction button to spin, release to stop.
+        // Squeeze R2 for proportional speed; release R2 alone defaults to full speed.
+        // btnLight3/4 also drive arm1 rotate CW/CCW as hold buttons.
         const r2Value  = readBtnValueBinding(armBindings.btnR2Mod, armGp, gp, armGp);
-        const r2Held   = r2Value > 0.05;
-        const rotCCW   = r2Held && readBtnBinding(armBindings.btnArm1RotateCCW, armGp, gp, armGp);
-        const rotCW    = r2Held && readBtnBinding(armBindings.btnArm1RotateCW,  armGp, gp, armGp);
-        const arm1RotPwm = rotCCW ? Math.round(1500 - r2Value * 500)
-                         : rotCW  ? Math.round(1500 + r2Value * 500) : 1500;
+        const r1Speed  = r2Value > 0.05 ? r2Value : 1.0;
+        const rotCCW   = readBtnBinding(armBindings.btnArm1RotateCCW, armGp, gp, armGp)
+                       || readBtnBinding(bindings.btnLight4, gp, gp, armGp);
+        const rotCW    = readBtnBinding(armBindings.btnArm1RotateCW,  armGp, gp, armGp)
+                       || readBtnBinding(bindings.btnLight3, gp, gp, armGp);
+        const arm1RotPwm = rotCCW ? Math.round(1500 - r1Speed * 500)
+                         : rotCW  ? Math.round(1500 + r1Speed * 500) : 1500;
         setArmSlider('arm1_rotate', clamp(arm1RotPwm, armRange['arm1_rotate'].min, armRange['arm1_rotate'].max));
 
-        // L2-modified: left arm rotate
+        // Left arm rotate: hold direction button to spin, release to stop.
+        // Squeeze L2 for proportional speed; release L2 alone defaults to full speed.
         const l2Value  = readBtnValueBinding(armBindings.btnL2Mod, armGp, gp, armGp);
-        const l2Held   = l2Value > 0.05;
-        const l2RotCCW = l2Held && readBtnBinding(armBindings.btnArm2RotateCCW, armGp, gp, armGp);
-        const l2RotCW  = l2Held && readBtnBinding(armBindings.btnArm2RotateCW,  armGp, gp, armGp);
-        const arm2RotPwm = l2RotCCW ? Math.round(1500 - l2Value * 500)
-                         : l2RotCW  ? Math.round(1500 + l2Value * 500) : 1500;
+        const l2Speed  = l2Value > 0.05 ? l2Value : 1.0;
+        const l2RotCCW = readBtnBinding(armBindings.btnArm2RotateCCW, armGp, gp, armGp);
+        const l2RotCW  = readBtnBinding(armBindings.btnArm2RotateCW,  armGp, gp, armGp);
+        const arm2RotPwm = l2RotCCW ? Math.round(1500 - l2Speed * 500)
+                         : l2RotCW  ? Math.round(1500 + l2Speed * 500) : 1500;
         setArmSlider('arm2_rotate', clamp(arm2RotPwm, armRange['arm2_rotate'].min, armRange['arm2_rotate'].max));
 
         // Camera zoom control
