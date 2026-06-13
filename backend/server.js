@@ -365,10 +365,12 @@ function mixThrusters(j){
   const vertical = clamp(j.vertical||0,-1,1);
   const roll = clamp(j.roll||0,-1,1);
 
-  let fl = -y + yaw + x;
-  let fr = -y - yaw - x;
-  let rl = -y + yaw - x;
-  let rr = -y - yaw + x;
+  const yw = y > 0.05 ? -yaw : yaw;
+
+  let fl = -y + yw + x;
+  let fr = -y - yw - x;
+  let rl = -y + yw - x;
+  let rr = -y - yw + x;
 
   const maxH = Math.max(1,Math.abs(fl),Math.abs(fr),Math.abs(rl),Math.abs(rr));
   fl/=maxH; fr/=maxH; rl/=maxH; rr/=maxH;
@@ -485,6 +487,10 @@ io.on('connection', socket=>{
     isArmed = !!state;
     Atomics.store(ctrlState, 0, isArmed ? 1 : 0);
     if (!isArmed) {
+      // Zero all joystick axes in shared memory so no stale signal can feed through,
+      // regardless of mode (depth hold, yaw hold, etc.). Gains at [5] and [6] are kept.
+      jsState[0] = 0; jsState[1] = 0; jsState[2] = 0;
+      jsState[3] = 0; jsState[4] = 0;
       const neutral = [1500,1500,1500,1500,1500,1500];
       latestRobotData.thrusters = neutral;
       io.emit('thruster-pwm', neutral);

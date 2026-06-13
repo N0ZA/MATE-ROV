@@ -4,7 +4,7 @@
   "axisYaw": 2,
   "axisThrottle": 3,
   "btnTrigger": 0,
-  "btnCalib": 8,
+  "btnCalib": -1,
   "btnGainUp": 4,
   "btnGainDown": 2,
   "btnVGainUp": 5,

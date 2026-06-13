@@ -1791,7 +1791,8 @@
     const any = activeModes.size > 0;
     const forward  = (any && !activeModes.has('surge')) ? 0 : -ny;
     const strafe   = (any && !activeModes.has('sway'))  ? 0 : nx;
-    const yaw      = yawHoldActive ? yawHoldCorrection : ((any && !activeModes.has('yaw')) ? 0 : yawNorm);
+    const yawRaw   = yawHoldActive ? yawHoldCorrection : ((any && !activeModes.has('yaw')) ? 0 : yawNorm);
+    const yaw      = (ny > 0.05) ? -yawRaw : yawRaw;
     const vertical = depthHoldActive ? depthCorrection
                    : (any && !activeModes.has('heave') ? 0 : verticalNorm);
     const roll     = rollHoldActive  ? rollCorrection
@@ -2000,7 +2001,11 @@
         const deadzone = (v, gain) => Math.abs(v) < 0.2 * gain * gain ? 0 : v;
 
         const calibBtn = readBtnBinding(bindings.btnCalib, gp, gp, armGp);
-        if (calibBtn && !btn8WasPressed) {
+        const calibSameAsArm = typeof bindings.btnCalib === 'number' && bindings.btnCalib >= 0 && (
+          bindings.btnCalib === bindings.btnArm ||
+          bindings.btnCalib === bindings.btnDisarm
+        );
+        if (calibBtn && !btn8WasPressed && !calibSameAsArm) {
           offsetX        = readAxisBinding(bindings.axisX,        gp, gp, armGp);
           offsetY        = readAxisBinding(bindings.axisY,        gp, gp, armGp);
           offsetYaw      = readAxisBinding(bindings.axisYaw,      gp, gp, armGp);
