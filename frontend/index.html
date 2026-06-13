@@ -344,8 +344,12 @@
           <h3>HOLD MODES</h3>
           <div style="display:flex; flex-direction:column; gap:5px; margin-top:5px;">
             <button class="sel-btn" id="hbtn-depth"     onclick="setHoldMode('depth')">DEPTH HOLD</button>
-            <button class="sel-btn" id="hbtn-roll"      onclick="setHoldMode('roll')">ROLL HOLD</button>
+            <button class="sel-btn" id="hbtn-roll" onclick="setHoldMode('roll')">ROLL HOLD</button>
+            <div class="label" id="rollHoldKpLabel" style="display:none; margin-top:4px;">Gain (KP)</div>
+            <div class="val-num" id="rollHoldKpDisplay" style="display:none; color:#a78bfa; font-size:11px;">0.020</div>
             <button class="sel-btn" id="hbtn-yaw" onclick="setHoldMode('yaw')">YAW HOLD</button>
+            <div class="label" id="yawHoldKpLabel" style="display:none; margin-top:4px;">Gain (KP)</div>
+            <div class="val-num" id="yawHoldKpDisplay" style="display:none; color:#a78bfa; font-size:11px;">0.050</div>
           </div>
         </div>
         <h3>LIVE THRUSTER MAP</h3>
@@ -378,11 +382,6 @@
         </div>
       </div>
 
-      <div class="card">
-        <h3>SENSORS</h3>
-        <div class="label">Network</div>
-        <div style="color:#22c55e; font-weight:bold;"><span id="ping">0</span> ms</div>
-      </div>
     </div>
 
     <!-- Camera strip -->
@@ -479,6 +478,24 @@
             <div class="invert-label">Yaw Hold</div>
             <div class="invert-desc">Reverse yaw hold correction direction</div>
             <button class="toggle-btn normal" id="inv-yawHoldDir" onclick="toggleInvert('yawHoldDir')">NORMAL</button>
+          </div>
+
+          <div class="invert-section-title">IMU Orientation</div>
+
+          <div class="invert-row">
+            <div class="invert-label">IMU Yaw</div>
+            <div class="invert-desc">Flip yaw sign read from IMU (affects yaw hold target tracking)</div>
+            <button class="toggle-btn normal" id="inv-imuYaw" onclick="toggleInvert('imuYaw')">NORMAL</button>
+          </div>
+          <div class="invert-row">
+            <div class="invert-label">IMU Pitch</div>
+            <div class="invert-desc">Flip pitch sign read from IMU</div>
+            <button class="toggle-btn normal" id="inv-imuPitch" onclick="toggleInvert('imuPitch')">NORMAL</button>
+          </div>
+          <div class="invert-row">
+            <div class="invert-label">IMU Roll</div>
+            <div class="invert-desc">Flip roll sign read from IMU (affects roll hold leveling direction)</div>
+            <button class="toggle-btn normal" id="inv-imuRoll" onclick="toggleInvert('imuRoll')">NORMAL</button>
           </div>
 
           <div class="invert-section-title">Arm 1</div>
@@ -580,6 +597,26 @@
                           border-radius:4px; padding:4px 6px; font-size:13px; text-align:center;"
                    oninput="setYawHoldStep(this.value)">
             <span style="font-family:Consolas,monospace; color:#facc15; font-size:12px; width:36px;">°</span>
+          </div>
+          <div class="theme-picker-row" style="margin-top:10px;">
+            <div class="invert-label">Yaw Hold Gain Step</div>
+            <div class="invert-desc">Yaw hold KP change per button press</div>
+            <input type="number" id="yawHoldKpStepInput"
+                   min="0.001" max="0.1" step="0.001" value="0.005"
+                   style="width:72px; background:var(--bg2); border:1px solid var(--p1); color:#facc15;
+                          border-radius:4px; padding:4px 6px; font-size:13px; text-align:center;"
+                   oninput="setYawHoldKpStep(this.value)">
+            <span style="font-family:Consolas,monospace; color:#facc15; font-size:12px; width:36px;">KP</span>
+          </div>
+          <div class="theme-picker-row" style="margin-top:10px;">
+            <div class="invert-label">Roll Hold Gain Step</div>
+            <div class="invert-desc">Roll hold KP change per button press</div>
+            <input type="number" id="rollHoldKpStepInput"
+                   min="0.001" max="0.1" step="0.001" value="0.002"
+                   style="width:72px; background:var(--bg2); border:1px solid var(--p1); color:#facc15;
+                          border-radius:4px; padding:4px 6px; font-size:13px; text-align:center;"
+                   oninput="setRollHoldKpStep(this.value)">
+            <span style="font-family:Consolas,monospace; color:#facc15; font-size:12px; width:36px;">KP</span>
           </div>
           <div class="theme-picker-row" style="margin-top:10px;">
             <div class="invert-label">Gain Step</div>
@@ -733,7 +770,7 @@
       <div class="modal-footer">
         <button class="modal-reset-btn" onclick="resetCurrentTab()">Reset Defaults</button>
         <button class="modal-save-btn" onclick="saveToDisk()">Save to Disk</button>
-        <button class="modal-close-btn" onclick="closeSettings()">Close</button>
+        <button class="modal-close-btn" onclick="closeSettings()">Close without Saving</button>
       </div>
     </div>
   </div>
@@ -908,12 +945,11 @@
     document.getElementById('pv').innerText = pitchDisplay.toFixed(1);
     document.getElementById('rv').innerText = rollDisplay.toFixed(1);
     document.getElementById('depth').innerText = ((data.depth ?? 0).toFixed ? (data.depth ?? 0).toFixed(2) : '0.00') + ' m';
-    document.getElementById('ping').innerText = Math.round(data.ping ?? 0);
 
-    latestRollDeg  = roll;
-    latestPitchDeg = pitch;
+    latestRollDeg  = axisInvert.imuRoll  ? -roll      : roll;
+    latestPitchDeg = axisInvert.imuPitch ? -pitch     : pitch;
     latestDepth    = Number(data.depth) || 0;
-    latestYawDeg   = yawAccum;
+    latestYawDeg   = axisInvert.imuYaw   ? -yawAccum  : yawAccum;
   });
 
   const leftStick = document.getElementById('leftStick');
@@ -940,6 +976,8 @@
   let depthHoldWas=false, rollHoldWas=false, yawHoldWas=false;
   let depthUpWas=false, depthDownWas=false;
   let yawStepCWWas=false, yawStepCCWWas=false;
+  let yawHoldKpUpWas=false,  yawHoldKpDownWas=false;
+  let rollHoldKpUpWas=false, rollHoldKpDownWas=false;
   let arm1Rot1100Was=false, arm1Rot1900Was=false,
       arm2Rot1100Was=false, arm2Rot1900Was=false;
   let armBtnWas=false, disarmBtnWas=false;
@@ -978,7 +1016,8 @@
   /* ============ AXIS INVERSION ============ */
   const DEFAULT_INVERT = {
     surge: false, sway: false, heave: false, yaw: false, pitch: false, roll: false,
-    depthHoldDir: false, rollHoldDir: false,
+    depthHoldDir: false, rollHoldDir: false, yawHoldDir: false,
+    imuYaw: false, imuPitch: false, imuRoll: false,
     arm1Slew: false, arm1Shoulder: false, arm1Rotate: false, arm1Gripper: false,
     arm2Slew: false, arm2Shoulder: false, arm2Rotate: false, arm2Gripper: false
   };
@@ -1147,11 +1186,13 @@
   });
 
   /* ============ HOLD MODES ============ */
-  const DEPTH_HOLD_KP = 1.5;  // m^-1: 0.67 m error → full vertical thrust
-  const DEPTH_HOLD_KI = 0.3;  // integral gain — drives steady-state buoyancy error to zero
-  const ROLL_HOLD_KP  = 0.02; // deg^-1: 50° error → full roll correction
-  const YAW_HOLD_KP   = 0.05; // deg^-1: 20° error → full yaw correction
-  const YAW_HOLD_KI   = 0.005;
+  const DEPTH_HOLD_KP  = 1.5;   // m^-1: 0.67 m error → full vertical thrust
+  const DEPTH_HOLD_KI  = 0.3;   // integral gain
+  let rollHoldKp     = parseFloat(localStorage.getItem('rollHoldKp')     || '0.02');
+  let rollHoldKpStep = parseFloat(localStorage.getItem('rollHoldKpStep') || '0.002');
+  let yawHoldKp      = parseFloat(localStorage.getItem('yawHoldKp')      || '0.05');
+  let yawHoldKpStep  = parseFloat(localStorage.getItem('yawHoldKpStep')  || '0.005');
+  const YAW_HOLD_KI  = 0.005;
 
   let depthHoldActive = false, depthHoldTarget = 0;
   let depthHoldStep = parseFloat(localStorage.getItem('depthHoldStep') || '0.02');
@@ -1210,6 +1251,8 @@
     btnDepthHold: -1, btnRollHold: -1, btnYawHold: -1,
     btnDepthUp: -1, btnDepthDown: -1,
     btnYawStepCW: -1, btnYawStepCCW: -1,
+    btnYawHoldGainUp: -1, btnYawHoldGainDown: -1,
+    btnRollHoldGainUp: -1, btnRollHoldGainDown: -1,
     btnArm1Rotate1100: -1, btnArm1Rotate1900: -1,
     btnArm2Rotate1100: -1, btnArm2Rotate1900: -1,
     btnArm: -1, btnDisarm: -1,
@@ -1346,6 +1389,22 @@
     if (inp) inp.value = v;
   }
 
+  function setYawHoldKpStep(val) {
+    const v = Math.max(0.001, Math.min(0.1, parseFloat(val) || 0.005));
+    yawHoldKpStep = v;
+    localStorage.setItem('yawHoldKpStep', v);
+    const inp = document.getElementById('yawHoldKpStepInput');
+    if (inp) inp.value = v;
+  }
+
+  function setRollHoldKpStep(val) {
+    const v = Math.max(0.001, Math.min(0.1, parseFloat(val) || 0.002));
+    rollHoldKpStep = v;
+    localStorage.setItem('rollHoldKpStep', v);
+    const inp = document.getElementById('rollHoldKpStepInput');
+    if (inp) inp.value = v;
+  }
+
   function setGainStep(val) {
     const v = Math.max(0.01, Math.min(0.5, parseFloat(val) || 0.05));
     gainStep = v;
@@ -1406,9 +1465,8 @@
     Promise.all([saveBindingsToDisk(), saveInvertToDisk(), saveRangeToDisk()])
       .then(() => {
         const btn = document.querySelector('.modal-save-btn');
-        const orig = btn.textContent;
         btn.textContent = 'SAVED ✓';
-        setTimeout(() => btn.textContent = orig, 1500);
+        setTimeout(() => closeSettings(), 800);
       })
       .catch(() => alert('Save failed — check server connection'));
   }
@@ -1451,8 +1509,12 @@
     { key: 'btnYawHold',   label: 'Yaw Hold',         type: 'button' },
     { key: 'btnDepthUp',    label: 'Depth Target +',      type: 'button' },
     { key: 'btnDepthDown',  label: 'Depth Target −',      type: 'button' },
-    { key: 'btnYawStepCW',  label: 'Yaw Target CW (+°)',  type: 'button' },
-    { key: 'btnYawStepCCW', label: 'Yaw Target CCW (−°)', type: 'button' },
+    { key: 'btnYawStepCW',      label: 'Yaw Target CW (+°)',       type: 'button' },
+    { key: 'btnYawStepCCW',     label: 'Yaw Target CCW (−°)',      type: 'button' },
+    { key: 'btnYawHoldGainUp',   label: 'Yaw Hold Gain +',  type: 'button' },
+    { key: 'btnYawHoldGainDown', label: 'Yaw Hold Gain −',  type: 'button' },
+    { key: 'btnRollHoldGainUp',  label: 'Roll Hold Gain +', type: 'button' },
+    { key: 'btnRollHoldGainDown',label: 'Roll Hold Gain −', type: 'button' },
     { section: 'Arm Rotate' },
     { key: 'btnArm1Rotate1100', label: 'Right Arm Rotate 1100', type: 'button' },
     { key: 'btnArm1Rotate1900', label: 'Right Arm Rotate 1900', type: 'button' },
@@ -1498,9 +1560,8 @@
       const src = controller === 'arm' ? armBindings : bindings;
       const listening = remapTarget === key && remapController === controller;
       const valueText = listening
-        ? (type === 'button' ? 'Move axis / press btn / key...' : 'Move axis...')
-        : isKeyBinding(src[key]) ? `Key: ${keyDisplayName(src[key])}`
-        : `${type === 'axis' ? 'Axis' : 'Button'} ${src[key]}`;
+        ? (type === 'button' ? 'Press btn/key on any controller...' : 'Move axis on any controller...')
+        : bindingDisplayText(src[key], type, controller === 'arm');
       list.innerHTML += `
         <div class="binding-row">
           <div class="binding-label">${label}</div>
@@ -1526,6 +1587,10 @@
     if (dsi) dsi.value = depthHoldStep;
     const ysi = document.getElementById('yawHoldStepInput');
     if (ysi) ysi.value = yawHoldStep;
+    const yksi = document.getElementById('yawHoldKpStepInput');
+    if (yksi) yksi.value = yawHoldKpStep;
+    const rksi = document.getElementById('rollHoldKpStepInput');
+    if (rksi) rksi.value = rollHoldKpStep;
     const gsi = document.getElementById('gainStepInput');
     if (gsi) gsi.value = gainStep;
     const czsi = document.getElementById('camZoomStepInput');
@@ -1674,6 +1739,24 @@
     document.getElementById('valDiagGain').textContent = Math.round(diagonalGain * 100) + '%';
     document.getElementById('valRollGain').textContent = Math.round(rollGain     * 100) + '%';
 
+    // Roll hold KP display
+    const rKpLabel = document.getElementById('rollHoldKpLabel');
+    const rKpDisp  = document.getElementById('rollHoldKpDisplay');
+    if (rKpLabel && rKpDisp) {
+      rKpLabel.style.display = rollHoldActive ? '' : 'none';
+      rKpDisp.style.display  = rollHoldActive ? '' : 'none';
+      if (rollHoldActive) rKpDisp.textContent = rollHoldKp.toFixed(3);
+    }
+
+    // Yaw hold KP display
+    const yKpLabel = document.getElementById('yawHoldKpLabel');
+    const yKpDisp  = document.getElementById('yawHoldKpDisplay');
+    if (yKpLabel && yKpDisp) {
+      yKpLabel.style.display = yawHoldActive ? '' : 'none';
+      yKpDisp.style.display  = yawHoldActive ? '' : 'none';
+      if (yawHoldActive) yKpDisp.textContent = yawHoldKp.toFixed(3);
+    }
+
     // Depth hold target display
     const dTLabel = document.getElementById('depthTargetLabel');
     const dTDisp  = document.getElementById('depthTargetDisplay');
@@ -1796,7 +1879,47 @@
   const pressedKeys = new Set();
   let _remapKeyHandler = null;
 
-  function isKeyBinding(val) { return typeof val === 'string' && val.startsWith('key:'); }
+  function isKeyBinding(val)  { return typeof val === 'string' && val.startsWith('key:'); }
+  function isBindingSet(val)  { return (typeof val === 'number' && val >= 0) || typeof val === 'string'; }
+
+  // Read a button binding from the correct controller.
+  // primaryGp = default controller for bare numeric values.
+  // Supports formats: N (number), 'key:X', 'flight:N', 'arm:N'
+  function readBtnBinding(val, primaryGp, flightGp, armGp) {
+    if (typeof val === 'number') return val >= 0 && !!primaryGp?.buttons[val]?.pressed;
+    if (typeof val !== 'string') return false;
+    if (val.startsWith('key:'))    return !isSettingsOpen() && pressedKeys.has(val.slice(4));
+    if (val.startsWith('arm:'))    { const i = parseInt(val.slice(4));  return i >= 0 && !!armGp?.buttons[i]?.pressed; }
+    if (val.startsWith('flight:')) { const i = parseInt(val.slice(7)); return i >= 0 && !!flightGp?.buttons[i]?.pressed; }
+    return false;
+  }
+
+  function readAxisBinding(val, primaryGp, flightGp, armGp) {
+    if (typeof val === 'number') return val >= 0 ? (primaryGp?.axes[val] ?? 0) : 0;
+    if (typeof val !== 'string') return 0;
+    if (val.startsWith('arm:'))    { const i = parseInt(val.slice(4));  return armGp?.axes[i]    ?? 0; }
+    if (val.startsWith('flight:')) { const i = parseInt(val.slice(7)); return flightGp?.axes[i] ?? 0; }
+    return 0;
+  }
+
+  // Like readBtnBinding but returns the analog value (0..1) instead of boolean — for triggers.
+  function readBtnValueBinding(val, primaryGp, flightGp, armGp) {
+    if (typeof val === 'number') return val >= 0 ? (primaryGp?.buttons[val]?.value ?? 0) : 0;
+    if (typeof val !== 'string') return 0;
+    if (val.startsWith('arm:'))    { const i = parseInt(val.slice(4));  return armGp?.buttons[i]?.value    ?? 0; }
+    if (val.startsWith('flight:')) { const i = parseInt(val.slice(7)); return flightGp?.buttons[i]?.value ?? 0; }
+    return 0;
+  }
+
+  function bindingDisplayText(val, type, isArmBinding) {
+    if (val === undefined || val === null || (typeof val === 'number' && val < 0)) return '—';
+    const kind = type === 'axis' ? 'Axis' : 'Btn';
+    if (typeof val === 'number')            return `[${isArmBinding ? 'Arm' : 'Flight'}] ${kind} ${val}`;
+    if (val.startsWith('key:'))             return `[Key] ${keyDisplayName(val)}`;
+    if (val.startsWith('arm:'))             return `[Arm] ${kind} ${val.slice(4)}`;
+    if (val.startsWith('flight:'))          return `[Flight] ${kind} ${val.slice(7)}`;
+    return '—';
+  }
 
   function keyDisplayName(val) {
     const code = val.slice(4);
@@ -1826,48 +1949,75 @@
   }
 
   function pollGamepad() {
-    const pads = navigator.getGamepads ? navigator.getGamepads() : [];
-    const gp = gpIndex !== null ? pads[gpIndex] : pads[0];
+    const pads   = navigator.getGamepads ? navigator.getGamepads() : [];
+    const gp     = gpIndex    !== null ? pads[gpIndex]    : pads[0];
+    const armGp  = gpArmIndex !== null ? pads[gpArmIndex] : null;
+
+    // ---- Unified remap detection: accepts input from flight OR arm controller ----
+    if (remapTarget !== null) {
+      const allMeta  = [...BINDING_META, ...ARM_BINDING_META];
+      const meta     = allMeta.find(m => m.key === remapTarget);
+      const isArmMeta = meta?.controller === 'arm';
+      const src      = isArmMeta ? armBindings : bindings;
+      let detected   = false;
+
+      if (meta?.type === 'axis') {
+        if (!detected && gp) {
+          for (let i = 0; i < gp.axes.length; i++) {
+            if (Math.abs(gp.axes[i]) > 0.7) { src[remapTarget] = isArmMeta ? `flight:${i}` : i; detected = true; break; }
+          }
+        }
+        if (!detected && armGp) {
+          for (let i = 0; i < armGp.axes.length; i++) {
+            if (Math.abs(armGp.axes[i]) > 0.7) { src[remapTarget] = isArmMeta ? i : `arm:${i}`; detected = true; break; }
+          }
+        }
+      } else {
+        if (!detected && gp) {
+          for (let i = 0; i < gp.buttons.length; i++) {
+            if (gp.buttons[i]?.pressed) { src[remapTarget] = isArmMeta ? `flight:${i}` : i; detected = true; break; }
+          }
+        }
+        if (!detected && armGp) {
+          for (let i = 0; i < armGp.buttons.length; i++) {
+            if (armGp.buttons[i]?.pressed) { src[remapTarget] = isArmMeta ? i : `arm:${i}`; detected = true; break; }
+          }
+        }
+      }
+
+      if (detected) {
+        if (isArmMeta) saveArmBindings(); else saveBindings();
+        remapTarget = null; remapController = null;
+        if (_remapKeyHandler) { document.removeEventListener('keydown', _remapKeyHandler, true); _remapKeyHandler = null; }
+        renderBindings();
+      }
+    }
+    // ----------------------------------------------------------------------------
 
     if (gp) {
       lastGpSeen = Date.now();
-      if (remapTarget !== null && remapController === 'flight') {
-        const meta = BINDING_META.find(m => m.key === remapTarget);
-        if (meta?.type === 'axis') {
-          for (let i = 0; i < gp.axes.length; i++) {
-            if (Math.abs(gp.axes[i]) > 0.7) {
-              bindings[remapTarget] = i; saveBindings(); remapTarget = null; remapController = null; renderBindings(); break;
-            }
-          }
-        } else if (meta?.type === 'button') {
-          for (let i = 0; i < gp.buttons.length; i++) {
-            if (gp.buttons[i]?.pressed) {
-              bindings[remapTarget] = i; saveBindings(); remapTarget = null; remapController = null; renderBindings(); break;
-            }
-          }
-        }
-      } else if (remapTarget === null) {
+      if (remapTarget === null) {
         const deadzone = (v, gain) => Math.abs(v) < 0.2 * gain * gain ? 0 : v;
 
-        const calibBtn = gp.buttons[bindings.btnCalib]?.pressed;
+        const calibBtn = readBtnBinding(bindings.btnCalib, gp, gp, armGp);
         if (calibBtn && !btn8WasPressed) {
-          offsetX        = gp.axes[bindings.axisX]        || 0;
-          offsetY        = gp.axes[bindings.axisY]        || 0;
-          offsetYaw      = gp.axes[bindings.axisYaw]      || 0;
-          offsetThrottle = gp.axes[bindings.axisThrottle] || 0;
+          offsetX        = readAxisBinding(bindings.axisX,        gp, gp, armGp);
+          offsetY        = readAxisBinding(bindings.axisY,        gp, gp, armGp);
+          offsetYaw      = readAxisBinding(bindings.axisYaw,      gp, gp, armGp);
+          offsetThrottle = readAxisBinding(bindings.axisThrottle, gp, gp, armGp);
         }
         btn8WasPressed = calibBtn;
 
         // FIX: axisX now correctly reads sway axis, axisYaw reads yaw axis
-        const raw_x        = deadzone(scaleAxis(gp.axes[bindings.axisX]        || 0, offsetX),        swayGain);
-        const raw_y        = deadzone(scaleAxis(gp.axes[bindings.axisY]        || 0, offsetY),        surgeGain);
-        const raw_yaw      = deadzone(scaleAxis(gp.axes[bindings.axisYaw]      || 0, offsetYaw),      yawGain);
-        const raw_throttle = deadzone(scaleAxis(gp.axes[bindings.axisThrottle] || 0, offsetThrottle), verticalGain);
+        const raw_x        = deadzone(scaleAxis(readAxisBinding(bindings.axisX,        gp, gp, armGp), offsetX),        swayGain);
+        const raw_y        = deadzone(scaleAxis(readAxisBinding(bindings.axisY,        gp, gp, armGp), offsetY),        surgeGain);
+        const raw_yaw      = deadzone(scaleAxis(readAxisBinding(bindings.axisYaw,      gp, gp, armGp), offsetYaw),      yawGain);
+        const raw_throttle = deadzone(scaleAxis(readAxisBinding(bindings.axisThrottle, gp, gp, armGp), offsetThrottle), verticalGain);
 
-        const trigger  = gp.buttons[bindings.btnTrigger]?.pressed;
+        const trigger  = readBtnBinding(bindings.btnTrigger, gp, gp, armGp);
         // Hat switch reads as POV axes (-1, 0, 1) — rising-edge detection per direction
-        const hatX = Math.round(gp.axes[bindings.axisHatX] || 0);
-        const hatY = Math.round(gp.axes[bindings.axisHatY] || 0);
+        const hatX = Math.round(readAxisBinding(bindings.axisHatX, gp, gp, armGp));
+        const hatY = Math.round(readAxisBinding(bindings.axisHatY, gp, gp, armGp));
 
         // Hat Y-axis: switch speed mode and restore that mode's stored gains
         if (hatY === 1  && prevHatY !== 1)  {
@@ -1883,10 +2033,10 @@
         if (hatX === -1 && prevHatX !== -1) verticalGain = Math.max(0.05, Math.round((verticalGain - gainStep) * 100) / 100);
         prevHatX = hatX; prevHatY = hatY;
 
-        const gainUp   = bindings.btnGainUp   >= 0 && !!gp.buttons[bindings.btnGainUp]?.pressed;
-        const gainDown = bindings.btnGainDown >= 0 && !!gp.buttons[bindings.btnGainDown]?.pressed;
-        const vgUp     = bindings.btnVGainUp  >= 0 && !!gp.buttons[bindings.btnVGainUp]?.pressed;
-        const vgDown   = bindings.btnVGainDown >= 0 && !!gp.buttons[bindings.btnVGainDown]?.pressed;
+        const gainUp   = readBtnBinding(bindings.btnGainUp,    gp, gp, armGp);
+        const gainDown = readBtnBinding(bindings.btnGainDown,  gp, gp, armGp);
+        const vgUp     = readBtnBinding(bindings.btnVGainUp,   gp, gp, armGp);
+        const vgDown   = readBtnBinding(bindings.btnVGainDown, gp, gp, armGp);
 
         // Btn 4/2: surge+sway only, persisted to active mode store
         if (gainUp && !gainUpWas) {
@@ -1912,11 +2062,7 @@
         }
         gainUpWas = gainUp; gainDownWas = gainDown; vgUpWas = vgUp; vgDownWas = vgDown;
 
-        const bp = key => {
-          const val = bindings[key];
-          if (isKeyBinding(val)) return !isSettingsOpen() && pressedKeys.has(val.slice(4));
-          return val >= 0 && !!gp.buttons[val]?.pressed;
-        };
+        const bp = key => readBtnBinding(bindings[key], gp, gp, armGp);
 
         const bDepth=bp('btnDepthHold'), bRollH=bp('btnRollHold'), bYawH=bp('btnYawHold');
         if (bDepth && !depthHoldWas) setHoldMode('depth');
@@ -1937,6 +2083,16 @@
           if (bYawCCW && !yawStepCCWWas) yawHoldTarget = Math.round((yawHoldTarget - yawHoldStep) * 10) / 10;
         }
         yawStepCWWas = bYawCW; yawStepCCWWas = bYawCCW;
+
+        const bYawKpUp=bp('btnYawHoldGainUp'), bYawKpDown=bp('btnYawHoldGainDown');
+        if (bYawKpUp   && !yawHoldKpUpWas)   { yawHoldKp = Math.min(0.5,   Math.round((yawHoldKp + yawHoldKpStep) * 1000) / 1000); localStorage.setItem('yawHoldKp', yawHoldKp); }
+        if (bYawKpDown && !yawHoldKpDownWas)  { yawHoldKp = Math.max(0.005, Math.round((yawHoldKp - yawHoldKpStep) * 1000) / 1000); localStorage.setItem('yawHoldKp', yawHoldKp); }
+        yawHoldKpUpWas=bYawKpUp; yawHoldKpDownWas=bYawKpDown;
+
+        const bRollKpUp=bp('btnRollHoldGainUp'), bRollKpDown=bp('btnRollHoldGainDown');
+        if (bRollKpUp   && !rollHoldKpUpWas)   { rollHoldKp = Math.min(0.5,   Math.round((rollHoldKp + rollHoldKpStep) * 1000) / 1000); localStorage.setItem('rollHoldKp', rollHoldKp); }
+        if (bRollKpDown && !rollHoldKpDownWas)  { rollHoldKp = Math.max(0.001, Math.round((rollHoldKp - rollHoldKpStep) * 1000) / 1000); localStorage.setItem('rollHoldKp', rollHoldKp); }
+        rollHoldKpUpWas=bRollKpUp; rollHoldKpDownWas=bRollKpDown;
 
         const bArmBtn=bp('btnArm'), bDisarmBtn=bp('btnDisarm');
         if (bArmBtn    && !armBtnWas)    setArmed(true);
@@ -2000,13 +2156,13 @@
         }
         if (rollHoldActive) {
           const rDir = axisInvert.rollHoldDir ? -1 : 1;
-          rollCorrection = clamp((0 - latestRollDeg) * ROLL_HOLD_KP, -1, 1) * rDir;
+          rollCorrection = clamp((0 - latestRollDeg) * rollHoldKp, -1, 1) * rDir;
         }
         if (yawHoldActive) {
           const yDir = axisInvert.yawHoldDir ? -1 : 1;
           const error = yawHoldTarget - latestYawDeg;
           yawHoldIntegral = clamp(yawHoldIntegral + error * 0.02, -30, 30);
-          yawHoldCorrection = clamp(error * YAW_HOLD_KP + yawHoldIntegral * YAW_HOLD_KI, -1, 1) * yDir;
+          yawHoldCorrection = clamp(error * yawHoldKp + yawHoldIntegral * YAW_HOLD_KI, -1, 1) * yDir;
         }
 
         updateThrusters();
@@ -2041,6 +2197,14 @@
           if (bYawCCW && !yawStepCCWWas) yawHoldTarget = Math.round((yawHoldTarget - yawHoldStep) * 10) / 10;
         }
         yawStepCWWas=bYawCW; yawStepCCWWas=bYawCCW;
+        const bYawKpUp=kbp('btnYawHoldGainUp'), bYawKpDown=kbp('btnYawHoldGainDown');
+        if (bYawKpUp   && !yawHoldKpUpWas)   { yawHoldKp = Math.min(0.5,   Math.round((yawHoldKp + yawHoldKpStep) * 1000) / 1000); localStorage.setItem('yawHoldKp', yawHoldKp); }
+        if (bYawKpDown && !yawHoldKpDownWas)  { yawHoldKp = Math.max(0.005, Math.round((yawHoldKp - yawHoldKpStep) * 1000) / 1000); localStorage.setItem('yawHoldKp', yawHoldKp); }
+        yawHoldKpUpWas=bYawKpUp; yawHoldKpDownWas=bYawKpDown;
+        const bRollKpUp=kbp('btnRollHoldGainUp'), bRollKpDown=kbp('btnRollHoldGainDown');
+        if (bRollKpUp   && !rollHoldKpUpWas)   { rollHoldKp = Math.min(0.5,   Math.round((rollHoldKp + rollHoldKpStep) * 1000) / 1000); localStorage.setItem('rollHoldKp', rollHoldKp); }
+        if (bRollKpDown && !rollHoldKpDownWas)  { rollHoldKp = Math.max(0.001, Math.round((rollHoldKp - rollHoldKpStep) * 1000) / 1000); localStorage.setItem('rollHoldKp', rollHoldKp); }
+        rollHoldKpUpWas=bRollKpUp; rollHoldKpDownWas=bRollKpDown;
         const bArmBtn=kbp('btnArm'), bDisarmBtn=kbp('btnDisarm');
         if (bArmBtn    && !armBtnWas)    setArmed(true);
         if (bDisarmBtn && !disarmBtnWas) setArmed(false);
@@ -2054,26 +2218,9 @@
       }
     }
     // --- DualSense arm controller ---
-    const armGp = gpArmIndex !== null ? pads[gpArmIndex] : null;
-    if (armGp) {
-      if (remapTarget !== null && remapController === 'arm') {
-        const meta = ARM_BINDING_META.find(m => m.key === remapTarget);
-        if (meta?.type === 'axis') {
-          for (let i = 0; i < armGp.axes.length; i++) {
-            if (Math.abs(armGp.axes[i]) > 0.7) {
-              armBindings[remapTarget] = i; saveArmBindings(); remapTarget = null; remapController = null; renderBindings(); break;
-            }
-          }
-        } else if (meta?.type === 'button') {
-          for (let i = 0; i < armGp.buttons.length; i++) {
-            if (armGp.buttons[i]?.pressed) {
-              armBindings[remapTarget] = i; saveArmBindings(); remapTarget = null; remapController = null; renderBindings(); break;
-            }
-          }
-        }
-      } else if (remapTarget === null) {
-        const slowMode = !!armGp.buttons[armBindings.btnSlowMode]?.pressed;
-        const fastMode = !!armGp.buttons[armBindings.btnFastMode]?.pressed;
+    if (armGp && remapTarget === null) {
+        const slowMode = readBtnBinding(armBindings.btnSlowMode, armGp, gp, armGp);
+        const fastMode = readBtnBinding(armBindings.btnFastMode, armGp, gp, armGp);
         const armGain  = slowMode ? ARM_SLOW_GAIN : fastMode ? ARM_FAST_GAIN : ARM_NORMAL_GAIN;
         const armTag = document.getElementById('armModeTag');
         if (armTag) {
@@ -2089,17 +2236,13 @@
           if (el) { el.value = pwm; updateArmValue(id); }
         };
 
-        setArmSlider('arm2_slew',     axPwm(armGp.axes[armBindings.axisLeftX]  || 0, 'arm2_slew'));
-        setArmSlider('arm2_shoulder', axPwm(armGp.axes[armBindings.axisLeftY]  || 0, 'arm2_shoulder'));
-        setArmSlider('arm1_slew',     axPwm(armGp.axes[armBindings.axisRightX] || 0, 'arm1_slew'));
-        setArmSlider('arm1_shoulder', axPwm(armGp.axes[armBindings.axisRightY] || 0, 'arm1_shoulder'));
-        if (armBindings.axisArm1Gripper >= 0) { const gv1 = armGp.axes[armBindings.axisArm1Gripper] || 0; setArmSlider('arm1_gripper', clamp(Math.round(1500 + armDz(gv1) * armGain * 500), 1000, 2000)); }
-        if (armBindings.axisArm2Gripper >= 0) { const gv2 = armGp.axes[armBindings.axisArm2Gripper] || 0; setArmSlider('arm2_gripper', clamp(Math.round(1500 + armDz(gv2) * armGain * 500), 1000, 2000)); }
-        const abpa = key => {
-          const val = armBindings[key];
-          if (isKeyBinding(val)) return !isSettingsOpen() && pressedKeys.has(val.slice(4));
-          return val >= 0 && !!armGp.buttons[val]?.pressed;
-        };
+        setArmSlider('arm2_slew',     axPwm(readAxisBinding(armBindings.axisLeftX,  armGp, gp, armGp), 'arm2_slew'));
+        setArmSlider('arm2_shoulder', axPwm(readAxisBinding(armBindings.axisLeftY,  armGp, gp, armGp), 'arm2_shoulder'));
+        setArmSlider('arm1_slew',     axPwm(readAxisBinding(armBindings.axisRightX, armGp, gp, armGp), 'arm1_slew'));
+        setArmSlider('arm1_shoulder', axPwm(readAxisBinding(armBindings.axisRightY, armGp, gp, armGp), 'arm1_shoulder'));
+        if (isBindingSet(armBindings.axisArm1Gripper)) { const gv1 = readAxisBinding(armBindings.axisArm1Gripper, armGp, gp, armGp); setArmSlider('arm1_gripper', clamp(Math.round(1500 + armDz(gv1) * armGain * 500), 1000, 2000)); }
+        if (isBindingSet(armBindings.axisArm2Gripper)) { const gv2 = readAxisBinding(armBindings.axisArm2Gripper, armGp, gp, armGp); setArmSlider('arm2_gripper', clamp(Math.round(1500 + armDz(gv2) * armGain * 500), 1000, 2000)); }
+        const abpa = key => readBtnBinding(armBindings[key], armGp, gp, armGp);
         const bG1_1100=abpa('btnArm1Gripper1100'), bG1_1900=abpa('btnArm1Gripper1900');
         const bG2_1100=abpa('btnArm2Gripper1100'), bG2_1900=abpa('btnArm2Gripper1900');
         if (bG1_1100 && !arm1Grip1100Was) { document.getElementById('arm1_gripper').value = gripperPwm.arm1_open;  updateArmValue('arm1_gripper'); emitArmControls(); }
@@ -2119,27 +2262,27 @@
         document.getElementById('arm2_gripper_close').classList.toggle('active', bG2_1900);
 
         // R2-modified: right arm rotate
-        const r2Value  = armGp.buttons[armBindings.btnR2Mod]?.value ?? 0;
+        const r2Value  = readBtnValueBinding(armBindings.btnR2Mod, armGp, gp, armGp);
         const r2Held   = r2Value > 0.05;
-        const rotCCW   = r2Held && !!armGp.buttons[armBindings.btnArm1RotateCCW]?.pressed;
-        const rotCW    = r2Held && !!armGp.buttons[armBindings.btnArm1RotateCW]?.pressed;
+        const rotCCW   = r2Held && readBtnBinding(armBindings.btnArm1RotateCCW, armGp, gp, armGp);
+        const rotCW    = r2Held && readBtnBinding(armBindings.btnArm1RotateCW,  armGp, gp, armGp);
         const arm1RotPwm = rotCCW ? Math.round(1500 - r2Value * 500)
                          : rotCW  ? Math.round(1500 + r2Value * 500) : 1500;
         setArmSlider('arm1_rotate', clamp(arm1RotPwm, armRange['arm1_rotate'].min, armRange['arm1_rotate'].max));
 
         // L2-modified: left arm rotate
-        const l2Value  = armGp.buttons[armBindings.btnL2Mod]?.value ?? 0;
+        const l2Value  = readBtnValueBinding(armBindings.btnL2Mod, armGp, gp, armGp);
         const l2Held   = l2Value > 0.05;
-        const l2RotCCW = l2Held && !!armGp.buttons[armBindings.btnArm2RotateCCW]?.pressed;
-        const l2RotCW  = l2Held && !!armGp.buttons[armBindings.btnArm2RotateCW]?.pressed;
+        const l2RotCCW = l2Held && readBtnBinding(armBindings.btnArm2RotateCCW, armGp, gp, armGp);
+        const l2RotCW  = l2Held && readBtnBinding(armBindings.btnArm2RotateCW,  armGp, gp, armGp);
         const arm2RotPwm = l2RotCCW ? Math.round(1500 - l2Value * 500)
                          : l2RotCW  ? Math.round(1500 + l2Value * 500) : 1500;
         setArmSlider('arm2_rotate', clamp(arm2RotPwm, armRange['arm2_rotate'].min, armRange['arm2_rotate'].max));
 
         // Camera zoom control
-        const bCamSel     = armBindings.btnCamSelect  >= 0 && !!armGp.buttons[armBindings.btnCamSelect]?.pressed;
-        const bCamZoomIn  = armBindings.btnCamZoomIn  >= 0 && !!armGp.buttons[armBindings.btnCamZoomIn]?.pressed;
-        const bCamZoomOut = armBindings.btnCamZoomOut >= 0 && !!armGp.buttons[armBindings.btnCamZoomOut]?.pressed;
+        const bCamSel     = readBtnBinding(armBindings.btnCamSelect,  armGp, gp, armGp);
+        const bCamZoomIn  = readBtnBinding(armBindings.btnCamZoomIn,  armGp, gp, armGp);
+        const bCamZoomOut = readBtnBinding(armBindings.btnCamZoomOut, armGp, gp, armGp);
         if (bCamSel && !optionsBtnWas) {
           const CW_CAMS = [2, 3, 5, 4];
           selectedCam = CW_CAMS[(CW_CAMS.indexOf(selectedCam) + 1) % CW_CAMS.length];
@@ -2153,7 +2296,7 @@
           camZooms[selectedCam - 1] = Math.max(1.0, Math.round((camZooms[selectedCam - 1] - camZoomStep) * 1000) / 1000);
           emitCamZoomState();
         }
-        const bPromoteCam = armBindings.btnPromoteCam >= 0 && !!armGp.buttons[armBindings.btnPromoteCam]?.pressed;
+        const bPromoteCam = readBtnBinding(armBindings.btnPromoteCam, armGp, gp, armGp);
         if (bPromoteCam && !promoteCamWas && selectedCam > 0) {
           socket.emit('promote-cam', { cam: selectedCam });
         }
@@ -2163,7 +2306,6 @@
         promoteCamWas = bPromoteCam;
 
         emitArmControls();
-      }
     }
 
     requestAnimationFrame(pollGamepad);

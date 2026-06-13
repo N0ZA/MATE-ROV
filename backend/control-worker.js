@@ -120,7 +120,7 @@ function mixAndSend() {
     relayData[2],           // R3 — light 3
     relayData[3],           // R4 — light 4
   ];
-
+  
   sock.send(
     Buffer.from(JSON.stringify({ type: 'all', pwms: packet, ts: Date.now() })),
     teensyPort,

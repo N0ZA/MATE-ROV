@@ -97,7 +97,9 @@ const DEFAULT_BINDINGS = {
   axisX: 5, axisY: 1, axisYaw: 0, axisThrottle: 6,
   btnTrigger: 0, btnCalib: 8,
   btnGainUp: 4, btnGainDown: 2, btnVGainUp: 5, btnVGainDown: 3,
-  axisHatX: 4, axisHatY: 5
+  axisHatX: 4, axisHatY: 5,
+  btnYawHoldGainUp: -1, btnYawHoldGainDown: -1,
+  btnRollHoldGainUp: -1, btnRollHoldGainDown: -1
 };
 
 function loadBindings() {
@@ -118,7 +120,8 @@ let savedBindings = loadBindings();
 const INVERT_FILE = join(__dirname, 'invert.json');
 const DEFAULT_INVERT = {
   surge: false, sway: false, heave: false, yaw: false, pitch: false, roll: false,
-  depthHoldDir: false, rollHoldDir: false,
+  depthHoldDir: false, rollHoldDir: false, yawHoldDir: false,
+  imuYaw: false, imuPitch: false, imuRoll: false,
   arm1Slew: false, arm1Shoulder: false, arm1Rotate: false, arm1Gripper: false,
   arm2Slew: false, arm2Shoulder: false, arm2Rotate: false, arm2Gripper: false
 };
@@ -395,6 +398,13 @@ function mixThrusters(j){
 }
 
 /* ================= DATASET CAPTURE ================= */
+const CAM_RTSP = {
+  2: 'rtsp://admin:admin@192.168.2.12:554/live/0/SUB',
+  3: 'rtsp://admin:Admin123@192.168.2.13:554/live/0/SUB',
+  4: 'rtsp://admin:Admin123@192.168.2.14:554/live/0/SUB',
+  5: 'rtsp://admin:Admin123@192.168.2.15:554/live/0/SUB',
+};
+
 let captureProc   = null;
 let captureCount  = 0;
 let captureActive = false;
@@ -404,7 +414,13 @@ function startCapture() {
   captureActive = true;
   captureCount  = 0;
   const script = join(__dirname, '../scripts/capture_dataset_metashape.py');
-  captureProc = spawn('python3', ['-u', script]);
+
+  const { selectedCam, camZooms } = latestCamZoomState;
+  const rtspUrl = CAM_RTSP[selectedCam] || CAM_RTSP[2];
+  const zoom    = (selectedCam > 0 && camZooms) ? (camZooms[selectedCam - 1] || 1.0) : 1.0;
+  console.log(`📸 Capturing from cam${selectedCam || 2} zoom×${zoom}  ${rtspUrl}`);
+
+  captureProc = spawn('python3', ['-u', script, '--rtsp-url', rtspUrl, '--zoom', String(zoom)]);
   captureProc.stdout.on('data', (data) => {
     for (const line of data.toString().trim().split('\n')) {
       if (line.startsWith('DONE:')) {

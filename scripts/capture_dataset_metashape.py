@@ -1,12 +1,21 @@
+import argparse
 import cv2
 import time
 import signal
 from datetime import datetime
 from pathlib import Path
 
-RTSP_URL         = "rtsp://admin:admin@192.168.2.12:554/"
+DEFAULT_RTSP = 'rtsp://admin:admin@192.168.2.12:554/live/0/SUB'
 CAPTURE_INTERVAL = 0.2
 DATASET_ROOT     = Path(__file__).resolve().parent.parent / "dataset"
+
+parser = argparse.ArgumentParser()
+parser.add_argument('--rtsp-url', default=DEFAULT_RTSP)
+parser.add_argument('--zoom', type=float, default=1.0)
+args = parser.parse_args()
+
+RTSP_URL = args.rtsp_url
+zoom     = max(1.0, args.zoom)
 
 running = True
 
@@ -16,6 +25,18 @@ def _stop(sig, frame):
 
 signal.signal(signal.SIGTERM, _stop)
 signal.signal(signal.SIGINT,  _stop)
+
+
+def apply_zoom(frame, z):
+    """Center-crop to replicate the CSS scale(z) zoom shown in the UI."""
+    if z <= 1.0:
+        return frame
+    h, w = frame.shape[:2]
+    ch, cw = int(h / z), int(w / z)
+    y0 = (h - ch) // 2
+    x0 = (w - cw) // 2
+    return cv2.resize(frame[y0:y0 + ch, x0:x0 + cw], (w, h), interpolation=cv2.INTER_LINEAR)
+
 
 output_dir = DATASET_ROOT / f"metashape_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
 output_dir.mkdir(parents=True, exist_ok=True)
@@ -29,6 +50,7 @@ while running:
     if not ret:
         cap.open(RTSP_URL)
         continue
+    frame = apply_zoom(frame, zoom)
     cv2.imwrite(str(output_dir / f"frame_{count:05d}.jpg"), frame,
                 [cv2.IMWRITE_JPEG_QUALITY, 95])
     count += 1

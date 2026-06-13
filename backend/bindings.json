@@ -11,6 +11,10 @@
   "btnVGainDown": 3,
   "axisHatX": 4,
   "axisHatY": 5,
+  "btnYawHoldGainUp": -1,
+  "btnYawHoldGainDown": -1,
+  "btnRollHoldGainUp": -1,
+  "btnRollHoldGainDown": -1,
   "btnDepthHold": 6,
   "btnRollHold": 7,
   "btnYawHold": -1,
@@ -26,7 +30,7 @@
   "btnDisarm": 9,
   "btnLight1": -1,
   "btnLight2": -1,
-  "btnLight3": "key:KeyH",
-  "btnLight4": "key:KeyJ",
+  "btnLight3": "arm:2",
+  "btnLight4": "arm:1",
   "btnStabilize": 1
 }
