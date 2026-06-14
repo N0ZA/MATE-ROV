@@ -367,10 +367,10 @@ function mixThrusters(j){
 
   const yw = y > 0.05 ? -yaw : yaw;
 
-  let fl = -y + yw + x;
-  let fr = -y - yw - x;
-  let rl = -y + yw - x;
-  let rr = -y - yw + x;
+  let fl = -y + yaw + x;
+  let fr = -y - yaw - x;
+  let rl = -y + yaw - x;
+  let rr = -y - yaw + x;
 
   const maxH = Math.max(1,Math.abs(fl),Math.abs(fr),Math.abs(rl),Math.abs(rr));
   fl/=maxH; fr/=maxH; rl/=maxH; rr/=maxH;
