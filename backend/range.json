@@ -1,0 +1,38 @@
+{
+  "thrusterRange": {
+    "min": 1100,
+    "max": 1900
+  },
+  "armRange": {
+    "arm1_slew": {
+      "min": 1000,
+      "max": 2000
+    },
+    "arm1_shoulder": {
+      "min": 1000,
+      "max": 2000
+    },
+    "arm1_rotate": {
+      "min": 1000,
+      "max": 2000
+    },
+    "arm2_slew": {
+      "min": 1000,
+      "max": 2000
+    },
+    "arm2_shoulder": {
+      "min": 1000,
+      "max": 2000
+    },
+    "arm2_rotate": {
+      "min": 1000,
+      "max": 2000
+    }
+  },
+  "gripperPwm": {
+    "arm1_open": 1100,
+    "arm1_close": 1901,
+    "arm2_open": 1100,
+    "arm2_close": 1901
+  }
+}

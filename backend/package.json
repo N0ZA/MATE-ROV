@@ -14,7 +14,6 @@
   "dependencies": {
     "@serialport/parser-readline": "^13.0.0",
     "express": "^5.2.1",
-    "node-mavlink": "^1.4.0",
     "serialport": "^13.0.0",
     "socket.io": "^4.8.3"
   }

@@ -6,7 +6,7 @@
 #include <MadgwickAHRS.h>
 #include <MS5837.h>
 
-// =====================================================
+// ========================================f=============
 // ETHERNET CONFIG
 // =====================================================
 
@@ -401,17 +401,19 @@ void readDepth() {
 
 // =====================================================
 // SEND TELEMETRY
-// Format: [roll,pitch,yaw,depth]
+// Format: [ISM_ROLL,ISM_PITCH,RM3100_YAW,BAR30_DEPTH,imuOk,magOk]
 // =====================================================
 
 void sendTelemetry() {
   char outBuf[96];
   snprintf(outBuf, sizeof(outBuf),
-           "[%.2f,%.2f,%.2f,%.3f]\n",
-           imuOk ? roll : 0.0f,
+           "[%.2f,%.2f,%.2f,%.3f,%d,%d]\n",
+           imuOk ? roll  : 0.0f,
            imuOk ? pitch : 0.0f,
-           imuOk ? yaw : 0.0f,
-           barOk ? depth : 0.0f);
+           magOk ? yaw   : 0.0f,
+           barOk ? depth : 0.0f,
+           (int)imuOk,
+           (int)magOk);
 
   UdpTelem.beginPacket(surfaceIP, surfaceTelemetryPort);
   UdpTelem.write((uint8_t*)outBuf, strlen(outBuf));

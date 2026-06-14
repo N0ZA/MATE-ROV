@@ -12,17 +12,36 @@
       --nosig: #5b3d8a;
     }
     html, body { width: 100%; height: 100%; background: #000; overflow: hidden; font-family: 'Segoe UI', sans-serif; }
+
+    /* ── DEFAULT: 2×2 grid ── */
     .grid {
       display: grid;
-      grid-template-columns: 2fr 1fr 1fr;
+      grid-template-columns: 1fr 1fr;
       grid-template-rows: 1fr 1fr;
-      grid-template-areas:
-        "cam1 cam2 cam3"
-        "cam1 cam4 cam5";
       gap: 6px;
       width: 100%; height: 100%;
       padding: 6px;
     }
+    /* strip is a transparent pass-through in grid mode */
+    .grid .strip { display: contents; }
+
+    /* ── PROMOTED: main + strip ── */
+    .grid.promoted {
+      grid-template-columns: 1fr 25vw;
+      grid-template-rows: 1fr;
+    }
+    .grid.promoted .strip {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .grid.promoted .strip .box { flex: 1; }
+
+    /* cursor hints */
+    .grid:not(.promoted) .box               { cursor: pointer; }
+    .grid.promoted .strip .box              { cursor: pointer; }
+    .grid.promoted #slot0                   { cursor: zoom-out; }
+
     .box {
       position: relative;
       background: var(--bg);
@@ -37,16 +56,13 @@
       font-weight: bold;
       letter-spacing: 1px;
     }
-    .box.cam1 { grid-area: cam1; }
-    .box.cam2 { grid-area: cam2; }
-    .box.cam3 { grid-area: cam3; }
-    .box.cam4 { grid-area: cam4; }
-    .box.cam5 { grid-area: cam5; }
     .box img {
       width: 100%;
       height: 100%;
-      object-fit: cover;
+      object-fit: contain;
       display: none;
+      transform-origin: center center;
+      transition: transform 0.12s ease;
     }
     .tag {
       position: absolute;
@@ -60,59 +76,445 @@
       border-radius: 3px;
       letter-spacing: 1px;
       z-index: 2;
+      pointer-events: none;
     }
-    .box.cam1 .tag { font-size: 13px; padding: 4px 14px; }
+    .box.cam-selected {
+      border-color: #c4b5fd !important;
+      box-shadow: 0 0 0 2px #c4b5fd, 0 0 18px rgba(196,181,253,0.45);
+    }
+    .zoom-badge {
+      position: absolute;
+      bottom: 8px;
+      right: 8px;
+      background: rgba(13,8,34,0.88);
+      color: #c4b5fd;
+      font-size: 10px;
+      font-weight: bold;
+      padding: 2px 7px;
+      border-radius: 3px;
+      border: 1px solid #c4b5fd;
+      z-index: 3;
+      letter-spacing: 0.5px;
+      display: none;
+      pointer-events: none;
+    }
+    /* drag-drop */
+    .box[draggable="true"] { cursor: grab; }
+    .grid:not(.promoted) .box[draggable="true"] { cursor: pointer; }
+    .box.dragging  { opacity: 0.35; cursor: grabbing; }
+    .box.drag-over { border-color: #c4b5fd !important; box-shadow: inset 0 0 0 3px #c4b5fd, 0 0 18px rgba(196,181,253,0.5); }
+
+    /* ── capture badge ── */
+    #capture-badge {
+      position: fixed;
+      top: 60px;
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 7px 18px;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: bold;
+      font-family: Consolas, monospace;
+      z-index: 9998;
+      display: none;
+      white-space: nowrap;
+      pointer-events: none;
+    }
+
+    /* ── inference overlay ── */
+    #infer-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.92);
+      z-index: 10000;
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 14px;
+      cursor: pointer;
+    }
+    #infer-overlay.open { display: flex; }
+    #infer-overlay img {
+      max-width: 90vw;
+      max-height: 75vh;
+      border: 2px solid #c4b5fd;
+      border-radius: 6px;
+      object-fit: contain;
+    }
+    #infer-count  { font-size: 24px; font-weight: bold; color: #00e664; font-family: Consolas, monospace; letter-spacing: 1px; }
+    #infer-status { font-size: 16px; color: #c4b5fd; font-family: Consolas, monospace; }
+    #infer-hint   { font-size: 11px; color: #5b3d8a; margin-top: -4px; }
   </style>
 </head>
 <body>
-  <div class="grid">
+  <div id="capture-badge"></div>
 
-    <div class="box cam1">
-      <span class="tag">CAM 1 — PIXHAWK</span>
-      <img id="cam1img" alt="CAM 1"
-           onload="this.style.display='block';this.nextElementSibling.style.display='none'"
-           onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
-      <span>NO SIGNAL</span>
-    </div>
-
-    <div class="box cam2">
-      <span class="tag">CAM 2</span>
-      <img id="cam2img" alt="CAM 2"
-           onload="this.style.display='block';this.nextElementSibling.style.display='none'"
-           onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
-      <span>NO SIGNAL</span>
-    </div>
-
-    <div class="box cam3">
-      <span class="tag">CAM 3</span>
-      <img id="cam3img" alt="CAM 3"
-           onload="this.style.display='block';this.nextElementSibling.style.display='none'"
-           onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
-      <span>NO SIGNAL</span>
-    </div>
-
-    <div class="box cam4">
-      <span class="tag">CAM 4</span>
-      <img id="cam4img" alt="CAM 4"
-           onload="this.style.display='block';this.nextElementSibling.style.display='none'"
-           onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
-      <span>NO SIGNAL</span>
-    </div>
-
-    <div class="box cam5">
-      <span class="tag">CAM 5</span>
-      <img id="cam5img" alt="CAM 5"
-           onload="this.style.display='block';this.nextElementSibling.style.display='none'"
-           onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
-      <span>NO SIGNAL</span>
-    </div>
-
+  <div id="infer-overlay" onclick="closeInfer()">
+    <div id="infer-status">🔍 Running crab detection...</div>
+    <div id="infer-count" style="display:none;"></div>
+    <img id="infer-img" src="" alt="Inference result" style="display:none;" onclick="event.stopPropagation()">
+    <div id="infer-hint" style="display:none;">Press any key or click anywhere to close</div>
   </div>
+
+  <button id="capture-btn" onclick="toggleCapture()"
+       style="position:fixed; top:12px; left:50%; transform:translateX(-50%);
+              background:#1e1040; color:#c4b5fd; border:2px solid #3d2972;
+              padding:6px 18px; border-radius:8px; font-size:14px;
+              font-family:Consolas,monospace; z-index:9999; cursor:pointer;
+              letter-spacing:0.5px; white-space:nowrap;">
+    📸 Dataset Capture &nbsp;<span id="capture-key-label">[?]</span>
+  </button>
+
+  <div class="grid" id="cam-grid">
+    <div class="box" id="slot0" draggable="true" data-slot="0">
+      <span class="tag" id="tag0"></span>
+      <img id="img0" alt="" crossorigin="anonymous"
+           onload="this.style.display='block';this.nextElementSibling.style.display='none'"
+           onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+      <span>NO SIGNAL</span>
+      <div class="zoom-badge" id="zoom0"></div>
+    </div>
+
+    <div class="strip">
+      <div class="box" id="slot1" draggable="true" data-slot="1">
+        <span class="tag" id="tag1"></span>
+        <img id="img1" alt="" crossorigin="anonymous"
+             onload="this.style.display='block';this.nextElementSibling.style.display='none'"
+             onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+        <span>NO SIGNAL</span>
+        <div class="zoom-badge" id="zoom1"></div>
+      </div>
+      <div class="box" id="slot2" draggable="true" data-slot="2">
+        <span class="tag" id="tag2"></span>
+        <img id="img2" alt="" crossorigin="anonymous"
+             onload="this.style.display='block';this.nextElementSibling.style.display='none'"
+             onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+        <span>NO SIGNAL</span>
+        <div class="zoom-badge" id="zoom2"></div>
+      </div>
+      <div class="box" id="slot3" draggable="true" data-slot="3">
+        <span class="tag" id="tag3"></span>
+        <img id="img3" alt="" crossorigin="anonymous"
+             onload="this.style.display='block';this.nextElementSibling.style.display='none'"
+             onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+        <span>NO SIGNAL</span>
+        <div class="zoom-badge" id="zoom3"></div>
+      </div>
+    </div>
+  </div>
+
   <script>
     const host = window.location.hostname;
-    for (let i = 1; i <= 5; i++) {
-      document.getElementById(`cam${i}img`).src = `http://${host}:3000/cam${i}`;
+    // Streams come from :3001 (this page's own server). The pilot UI strip
+    // uses :3000. Browsers allow only ~6 concurrent connections per
+    // host:port and each MJPEG feed holds one open — splitting the two
+    // pages across ports keeps both under the limit.
+    const CAM_PORT = 3001;
+    const CAM_LABELS = { 2: 'CAM 2', 3: 'CAM 3', 4: 'CAM 4', 5: 'CAM 5' };
+
+    // slot index → camera number (2–5)
+    let slotToCam = [2, 3, 4, 5];
+    let promoted  = false;
+
+    function renderSlots() {
+      // Two-phase swap. Changing two imgs' srcs to each other's URLs at the
+      // same time starts new connections before the old identical-URL ones
+      // are torn down — that can momentarily exceed the browser's per-port
+      // connection cap and the over-limit request queues forever (no onerror),
+      // which is why a swapped-out main cam used to die until refresh.
+      // Phase 1: detach every img whose camera changed (aborts old streams).
+      const changed = [];
+      for (let s = 0; s < 4; s++) {
+        const cam  = slotToCam[s];
+        const img  = document.getElementById(`img${s}`);
+        const tag  = document.getElementById(`tag${s}`);
+        const base = `http://${host}:${CAM_PORT}/cam${cam}`;
+        if (tag) tag.textContent = CAM_LABELS[cam] || `CAM ${cam}`;
+        if (img.dataset.base !== base) {
+          img.dataset.base = base;
+          img.style.display = 'none';
+          img.nextElementSibling.style.display = 'flex';
+          img.src = '';            // setting src='' triggers a proper request-abort for MJPEG connections;
+          img.removeAttribute('src'); // then remove the attribute so the error-handler guard sees null
+          changed.push(img);
+        }
+      }
+      // Phase 2: attach new URLs after the aborts settle. Cache-buster makes
+      // every request unique so the browser can't reuse or coalesce streams.
+      // 400ms (was 150ms) — MJPEG connections are persistent streams; the browser
+      // needs more time to fully release the connection slot from its per-host pool
+      // before a new request to the same port can go through without being queued.
+      if (changed.length) {
+        setTimeout(() => {
+          for (const img of changed) img.src = img.dataset.base + '?t=' + Date.now();
+        }, 400);
+      }
     }
+
+    function swapSlots(a, b) {
+      [slotToCam[a], slotToCam[b]] = [slotToCam[b], slotToCam[a]];
+      renderSlots();
+    }
+
+    function promoteToMain(slotIdx) {
+      const grid = document.getElementById('cam-grid');
+      if (!promoted) {
+        // 2×2 mode: any click promotes that slot to main
+        if (slotIdx !== 0) swapSlots(0, slotIdx);
+        promoted = true;
+        grid.classList.add('promoted');
+      } else if (slotIdx === 0) {
+        // click main → back to 2×2
+        promoted = false;
+        grid.classList.remove('promoted');
+      } else {
+        // click strip feed → swap with main
+        swapSlots(0, slotIdx);
+      }
+    }
+
+    // Wire click handlers
+    for (let s = 0; s < 4; s++) {
+      document.getElementById(`slot${s}`).addEventListener('click', (e) => {
+        // Don't fire during drag
+        if (e.detail === 0) return;
+        promoteToMain(s);
+      });
+    }
+
+    renderSlots();
+
+    // Auto-reconnect helpers
+    function camReconnect(img) {
+      const base = img.dataset.base;
+      if (!base) return;
+      img.src = '';
+      setTimeout(() => { img.src = base + '?t=' + Date.now(); }, 500);
+    }
+
+    // onerror retry — fires when the HTTP connection drops entirely.
+    // Skip when src was intentionally removed mid-swap (renderSlots phase 1).
+    for (let s = 0; s < 4; s++) {
+      document.getElementById(`img${s}`).addEventListener('error', function() {
+        if (!this.getAttribute('src')) return;
+        setTimeout(() => camReconnect(this), 3000);
+      });
+    }
+
+    // Canvas watchdog — detects frozen frames AND stalled connections.
+    // A request stuck in the browser's connection queue never fires onerror,
+    // so the error-retry above can't see it; this catches it instead.
+    ;(function() {
+      const cv  = document.createElement('canvas');
+      cv.width  = 8; cv.height = 8;
+      const ctx = cv.getContext('2d', { willReadFrequently: true });
+      const st  = Array.from({ length: 4 }, () => ({ hash: null, ticks: 0, stall: 0 }));
+      setInterval(() => {
+        for (let s = 0; s < 4; s++) {
+          const img = document.getElementById(`img${s}`);
+          if (!img || !img.src) { st[s].hash = null; st[s].ticks = 0; st[s].stall = 0; continue; }
+          // src is set but nothing has ever arrived → stalled/queued request.
+          // 4 ticks = 20s, generous enough for slow RTSP startup retries.
+          if (img.style.display === 'none' || img.naturalWidth === 0) {
+            st[s].hash = null; st[s].ticks = 0;
+            if (++st[s].stall >= 4) { st[s].stall = 0; camReconnect(img); }
+            continue;
+          }
+          st[s].stall = 0;
+          let hash;
+          try { ctx.drawImage(img, 0, 0, 8, 8); hash = ctx.getImageData(0, 0, 8, 8).data.join(','); }
+          catch { continue; }
+          if (hash === st[s].hash) {
+            if (++st[s].ticks >= 4) { st[s].hash = null; st[s].ticks = 0; camReconnect(img); }
+          } else { st[s].hash = hash; st[s].ticks = 0; }
+        }
+      }, 5000);
+    })();
+
+    function applyZoomState(data) {
+      const sel   = data.selectedCam || 0;
+      const zooms = data.camZooms || [1, 1, 1, 1, 1];
+      for (let s = 0; s < 4; s++) {
+        const cam   = slotToCam[s];
+        const box   = document.getElementById(`slot${s}`);
+        const img   = document.getElementById(`img${s}`);
+        const badge = document.getElementById(`zoom${s}`);
+        const z     = zooms[cam - 1] || 1.0;
+        if (img)   img.style.transform = z !== 1.0 ? `scale(${z})` : '';
+        if (sel === cam) {
+          box.classList.add('cam-selected');
+          if (badge) { badge.textContent = `${Math.round(z * 100)}%`; badge.style.display = ''; }
+        } else {
+          box.classList.remove('cam-selected');
+          if (badge) badge.style.display = 'none';
+        }
+      }
+    }
+
+    /* ── Dataset Capture ── */
+    let captureKey = 'a';
+
+    function updateCaptureBtn(active, count) {
+      const btn = document.getElementById('capture-btn');
+      if (!btn) return;
+      if (active) {
+        btn.style.background = '#dc2626';
+        btn.style.color = '#fff';
+        btn.style.borderColor = '#dc2626';
+        btn.innerHTML = `● REC &nbsp;<span id="capture-key-label">${count} images</span>`;
+      } else {
+        btn.style.background = '#1e1040';
+        btn.style.color = '#c4b5fd';
+        btn.style.borderColor = '#3d2972';
+        btn.innerHTML = `📸 Dataset Capture &nbsp;<span id="capture-key-label">[${captureKey}]</span>`;
+      }
+    }
+
+    function toggleCapture() {
+      if (window._camSocket) window._camSocket.emit('toggle-capture');
+    }
+
+    fetch(`http://${host}:3000/api/capture-key`)
+      .then(r => r.json())
+      .then(d => { captureKey = d.key || 'a'; updateCaptureBtn(false, 0); })
+      .catch(() => updateCaptureBtn(false, 0));
+
+    /* ── Crab Detection ── */
+    let _capturedFrame = null;
+
+    function showBadge(msg, color, textColor) {
+      const badge = document.getElementById('capture-badge');
+      badge.textContent = msg;
+      badge.style.background = color || 'rgba(0,200,100,0.92)';
+      badge.style.color = textColor || '#000';
+      badge.style.display = 'block';
+      clearTimeout(badge._t);
+      badge._t = setTimeout(() => { badge.style.display = 'none'; }, 3500);
+    }
+
+    function captureSelectedCam() {
+      let selSlot = -1;
+      for (let s = 0; s < 4; s++) {
+        if (document.getElementById(`slot${s}`)?.classList.contains('cam-selected')) { selSlot = s; break; }
+      }
+      if (selSlot === -1) { showBadge('⚠ No camera selected — use controller to select one', '#f59e0b', '#000'); return; }
+      const img = document.getElementById(`img${selSlot}`);
+      if (!img || img.style.display === 'none') { showBadge('⚠ No signal on selected camera', '#ef4444', '#fff'); return; }
+      const w = img.naturalWidth  > 0 ? img.naturalWidth  : img.clientWidth  || 640;
+      const h = img.naturalHeight > 0 ? img.naturalHeight : img.clientHeight || 480;
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      try {
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        _capturedFrame = canvas.toDataURL('image/png');
+        showBadge(`📸 CAM ${slotToCam[selSlot]} captured — press C to run crab detection`, 'rgba(0,200,100,0.92)', '#000');
+      } catch (err) {
+        showBadge('⚠ Capture failed (CORS?) — check server logs', '#ef4444', '#fff');
+        console.error('Canvas capture error:', err);
+      }
+    }
+
+    function runCrabInference() {
+      if (!_capturedFrame) { showBadge('⚠ No frame captured — press B first', '#f59e0b', '#000'); return; }
+      showBadge('🔍 Running crab detection...', '#3d2972', '#c4b5fd');
+      fetch(`http://${host}:3000/api/capture-frame`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image: _capturedFrame })
+      })
+      .then(r => r.json())
+      .then(() => fetch(`http://${host}:3000/api/infer-crabs`, { method: 'POST' }))
+      .then(r => r.json())
+      .then(result => {
+        if (result.error) { showBadge('⚠ ' + result.error.slice(0, 60), '#ef4444', '#fff'); return; }
+        document.getElementById('infer-status').style.display = 'none';
+        const countEl = document.getElementById('infer-count');
+        countEl.textContent = `European Crabs Detected: ${result.count}`;
+        countEl.style.display = '';
+        const imgEl = document.getElementById('infer-img');
+        imgEl.src = result.image;
+        imgEl.style.display = '';
+        document.getElementById('infer-hint').style.display = '';
+        document.getElementById('infer-overlay').classList.add('open');
+      })
+      .catch(err => showBadge('⚠ Error: ' + err.message, '#ef4444', '#fff'));
+    }
+
+    function closeInfer() {
+      document.getElementById('infer-overlay').classList.remove('open');
+      document.getElementById('infer-status').style.display = '';
+      document.getElementById('infer-count').style.display  = 'none';
+      document.getElementById('infer-img').style.display    = 'none';
+      document.getElementById('infer-hint').style.display   = 'none';
+    }
+
+    document.addEventListener('keydown', (e) => {
+      if (document.getElementById('infer-overlay').classList.contains('open')) { closeInfer(); return; }
+      const key = e.key === ' ' ? 'Space' : e.key;
+      if (key === 'Escape')          { e.preventDefault(); if (promoted) promoteToMain(0); return; }
+      if (key === 'b' || key === 'B') { e.preventDefault(); captureSelectedCam(); return; }
+      if (key === 'c' || key === 'C') { e.preventDefault(); runCrabInference(); return; }
+      if (key !== captureKey) return;
+      e.preventDefault();
+      toggleCapture();
+    });
+
+    /* ── Drag-drop ── */
+    (function setupDrag() {
+      let dragSrcSlot = null;
+      document.querySelectorAll('.box[data-slot]').forEach(box => {
+        box.addEventListener('dragstart', e => {
+          dragSrcSlot = parseInt(box.dataset.slot);
+          box.classList.add('dragging');
+          e.dataTransfer.effectAllowed = 'move';
+        });
+        box.addEventListener('dragend', () => {
+          box.classList.remove('dragging');
+          document.querySelectorAll('.box').forEach(b => b.classList.remove('drag-over'));
+          dragSrcSlot = null;
+        });
+        box.addEventListener('dragover', e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; });
+        box.addEventListener('dragenter', e => {
+          e.preventDefault();
+          const dest = parseInt(box.dataset.slot);
+          if (dragSrcSlot !== null && dest !== dragSrcSlot) box.classList.add('drag-over');
+        });
+        box.addEventListener('dragleave', e => {
+          if (!box.contains(e.relatedTarget)) box.classList.remove('drag-over');
+        });
+        box.addEventListener('drop', e => {
+          e.preventDefault();
+          box.classList.remove('drag-over');
+          const dest = parseInt(box.dataset.slot);
+          if (dragSrcSlot !== null && dragSrcSlot !== dest) swapSlots(dragSrcSlot, dest);
+        });
+      });
+    })();
+
+    /* ── Socket.io ── */
+    const sioScript = document.createElement('script');
+    sioScript.src = `http://${host}:3000/socket.io/socket.io.js`;
+    sioScript.onload = function() {
+      const socket = io(`http://${host}:3000`);
+      window._camSocket = socket;
+      socket.on('cam-zoom-state', applyZoomState);
+      socket.on('capture-status', ({ active, count }) => updateCaptureBtn(active, count));
+      socket.on('cam-restart', ({ cam }) => {
+        const slotIdx = slotToCam.indexOf(cam);
+        if (slotIdx === -1) return;
+        const img = document.getElementById(`img${slotIdx}`);
+        if (!img) return;
+        // Quiet reconnect — don't blank the image, just refresh the src after a short delay
+        const base = img.dataset.base;
+        if (base) setTimeout(() => { if (img.src) img.src = base + '?t=' + Date.now(); }, 2000);
+      });
+      socket.on('promote-cam', ({ cam }) => {
+        const slotIdx = slotToCam.indexOf(cam);
+        if (slotIdx !== -1) promoteToMain(slotIdx);
+      });
+    };
+    document.head.appendChild(sioScript);
   </script>
 </body>
 </html>
