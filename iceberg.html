@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Iceberg Threat Console — 2026 MATE ROV</title>
+<style>
+  :root{
+    --bg:#0a111e; --panel:#121d2f; --panel-2:#0e1726; --panel-line:#22324d;
+    --text:#e7edf7; --text-dim:#8295b3; --eyebrow:#5a7099;
+    --ink:#0c1828; --chart-border:#2b3e5e; --grid-major:#22344f; --grid-minor:#172539;
+    --lonlat:#7e91b1; --marker:#cdd8ec; --marker-label:#e7edf7;
+    --ice:#5bc8ff; --ice-glow:#1d4e6b; --track:#5bc8ff;
+    --leader:#5d6f8e; --leader-bg:#0c1828;
+    --ring-red:#f85149; --ring-amber:#e3a008; --ring-sub:#3a6ea5;
+    --green:#3fb950; --green-d:#1a7f37; --amber:#e3a008; --amber-d:#9a6700; --red:#f85149; --red-d:#cf222e;
+    --green-bg:rgba(63,185,80,.15); --green-tx:#56d364;
+    --amber-bg:rgba(227,160,8,.16); --amber-tx:#e3b341;
+    --red-bg:rgba(248,81,73,.16); --red-tx:#ff8077;
+    --radius:12px; --radius-sm:8px;
+    --mono:ui-monospace,"SF Mono","Cascadia Code",Menlo,Consolas,"Liberation Mono",monospace;
+    --sans:ui-sans-serif,system-ui,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);
+       line-height:1.5;-webkit-font-smoothing:antialiased;padding:24px 18px 60px}
+  .app{max-width:1120px;margin:0 auto}
+  .eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.22em;text-transform:uppercase;
+           color:var(--eyebrow);margin:0 0 6px}
+  h1{font-size:26px;font-weight:600;letter-spacing:-.01em;margin:0 0 4px}
+  .lede{color:var(--text-dim);font-size:14px;margin:0 0 22px;max-width:60ch}
+  .grid{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(280px,1fr);gap:18px;align-items:start}
+  .panel{background:var(--panel);border:1px solid var(--panel-line);border-radius:var(--radius);padding:16px}
+  .panel-2{background:var(--panel-2)}
+  .panel h2{font-size:12px;font-family:var(--mono);letter-spacing:.14em;text-transform:uppercase;
+            color:var(--eyebrow);margin:0 0 12px;font-weight:600}
+  svg.chart{width:100%;height:auto;display:block;touch-action:none;border-radius:var(--radius-sm);cursor:crosshair}
+  .chart-meta{display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-top:10px;
+              font-family:var(--mono);font-size:12px;color:var(--text-dim)}
+  .toggles{display:flex;gap:16px;flex-wrap:wrap;margin-top:12px;font-size:13px;color:var(--text-dim)}
+  .toggles label{display:flex;align-items:center;gap:7px;cursor:pointer;user-select:none}
+  .toggles input{accent-color:var(--ice);width:15px;height:15px}
+
+  .presets{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px}
+  .presets button{font-family:var(--mono);font-size:12px;letter-spacing:.06em;padding:7px 11px;
+    border:1px solid var(--panel-line);background:transparent;color:var(--text-dim);
+    border-radius:var(--radius-sm);cursor:pointer;transition:.15s}
+  .presets button:hover{border-color:var(--ice);color:var(--text)}
+  .presets button.active{border-color:var(--ice);color:var(--ice);background:rgba(91,200,255,.08)}
+
+  .fields{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+  .field{display:flex;flex-direction:column;gap:5px}
+  .field .row{display:flex;gap:6px}
+  .field label{font-size:11px;font-family:var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--eyebrow)}
+  .field input{width:100%;font-family:var(--mono);font-size:15px;color:var(--text);
+    background:var(--panel-2);border:1px solid var(--panel-line);border-radius:var(--radius-sm);
+    padding:9px 10px;outline:none;transition:.15s}
+  .field input:focus{border-color:var(--ice);box-shadow:0 0 0 3px rgba(91,200,255,.18)}
+  .field .unit{align-self:center;font-family:var(--mono);font-size:13px;color:var(--text-dim);min-width:14px}
+
+  .verdict{margin-top:16px;display:flex;gap:10px;flex-wrap:wrap}
+  .vpill{flex:1;min-width:120px;background:var(--panel-2);border:1px solid var(--panel-line);
+         border-radius:var(--radius-sm);padding:10px 12px}
+  .vpill .k{font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--eyebrow)}
+  .vpill .v{font-size:15px;font-weight:600;margin-top:3px}
+  .match{margin-top:14px;font-size:13px;font-family:var(--mono);padding:9px 12px;border-radius:var(--radius-sm);display:none}
+
+  .results{margin-top:18px}
+  .results h2{font-size:12px;font-family:var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--eyebrow);margin:0 0 12px}
+  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+  .card{background:var(--panel);border:1px solid var(--panel-line);border-radius:var(--radius);padding:14px 16px}
+  .card .cn{display:flex;justify-content:space-between;align-items:baseline}
+  .card .name{font-size:16px;font-weight:600}
+  .card .depth{font-family:var(--mono);font-size:12px;color:var(--text-dim)}
+  .threatline{display:flex;justify-content:space-between;align-items:center;margin-top:10px}
+  .threatline .lbl{font-size:12px;font-family:var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--eyebrow)}
+  .badge{font-family:var(--mono);font-size:12px;font-weight:600;letter-spacing:.06em;padding:4px 11px;border-radius:6px}
+  .b-G{background:var(--green-bg);color:var(--green-tx)}
+  .b-Y{background:var(--amber-bg);color:var(--amber-tx)}
+  .b-R{background:var(--red-bg);color:var(--red-tx)}
+  .card .foot{margin-top:11px;padding-top:10px;border-top:1px solid var(--panel-line);
+              font-family:var(--mono);font-size:11.5px;color:var(--text-dim);line-height:1.6}
+
+  .reference{margin-top:22px}
+  details{background:var(--panel);border:1px solid var(--panel-line);border-radius:var(--radius);padding:0 16px}
+  summary{cursor:pointer;list-style:none;padding:14px 0;font-size:13px;font-family:var(--mono);
+          letter-spacing:.1em;text-transform:uppercase;color:var(--text-dim)}
+  summary::-webkit-details-marker{display:none}
+  summary::before{content:"+ ";color:var(--ice)}
+  details[open] summary::before{content:"\2212 "}
+  .ref-body{padding:4px 0 18px;font-size:13.5px;color:var(--text-dim);line-height:1.65}
+  .ref-body strong{color:var(--text);font-weight:600}
+  table.ref{width:100%;border-collapse:collapse;margin:12px 0;font-family:var(--mono);font-size:12.5px}
+  table.ref th,table.ref td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--panel-line)}
+  table.ref th{color:var(--eyebrow);font-weight:600;letter-spacing:.06em}
+  table.ref td{color:var(--text)}
+  .pbtn{font-family:var(--mono);font-size:12px;letter-spacing:.06em;padding:8px 14px;border:1px solid var(--panel-line);
+        background:transparent;color:var(--text-dim);border-radius:var(--radius-sm);cursor:pointer;margin-top:14px}
+  .pbtn:hover{border-color:var(--ice);color:var(--text)}
+  .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+
+  .pulse{transform-box:fill-box;transform-origin:center}
+  @media (prefers-reduced-motion:no-preference){
+    .pulse{animation:pulse 2.4s ease-out infinite}
+    @keyframes pulse{0%{transform:scale(.6);opacity:.55}70%{transform:scale(2.6);opacity:0}100%{opacity:0}}
+  }
+  @media (max-width:860px){.grid{grid-template-columns:1fr}}
+
+  @media print{
+    :root{--bg:#fff;--panel:#fff;--panel-2:#fff;--panel-line:#c4cedd;--text:#10182a;--text-dim:#475168;
+      --eyebrow:#5b6a86;--ink:#f6f8fc;--chart-border:#b6c2d6;--grid-major:#cbd5e6;--grid-minor:#e6ecf4;
+      --lonlat:#3c4862;--marker:#1b2a4a;--marker-label:#10182a;--ice:#0a6aa8;--track:#0a6aa8;--ice-glow:#bfe3f5;
+      --leader:#8290a8;--leader-bg:#f6f8fc;--green-tx:#1a7f37;--amber-tx:#9a6700;--red-tx:#cf222e;
+      --green-bg:#e6f5ea;--amber-bg:#fbf1d8;--red-bg:#fbe6e5;}
+    body{padding:0}.toggles,.presets,.pbtn,.field input:focus{display:initial}
+    .pulse{display:none}
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <p class="eyebrow">2026 MATE ROV &middot; Explorer / Pioneer / Ranger</p>
+  <h1>Iceberg threat console</h1>
+  <p class="lede">Enter the surveyed iceberg position, heading and keel depth. The chart projects the drift track and grades the threat to each Grand Banks platform and its subsea assets. Click the chart to drop the iceberg; drag the arrow tip to set heading.</p>
+
+  <div class="grid">
+    <div class="panel">
+      <h2>Drift chart &mdash; Jeanne d'Arc Basin</h2>
+      <svg class="chart" id="chart" viewBox="0 0 700 560" role="img" aria-label="Nautical chart showing the four oil platforms and the iceberg's projected drift track.">
+        <defs></defs>
+        <rect id="chartbg" x="70" y="44" width="560" height="480" rx="6" style="fill:var(--ink);stroke:var(--chart-border);stroke-width:1"></rect>
+        <g id="gridMinor"></g>
+        <g id="gridMajor"></g>
+        <g id="labels"></g>
+        <g id="rings"></g>
+        <g id="platforms"></g>
+        <clipPath id="plotClip"><rect x="70" y="44" width="560" height="480" rx="6"></rect></clipPath>
+        <g id="dyn" clip-path="url(#plotClip)"></g>
+      </svg>
+      <div class="chart-meta">
+        <span id="metaPos">&nbsp;</span>
+        <span id="metaHK">&nbsp;</span>
+      </div>
+      <div class="toggles">
+        <label><input type="checkbox" id="tgRings" checked> Range rings (5 / 10 / 25 nm)</label>
+        <label><input type="checkbox" id="tgLeaders" checked> Closest-approach leaders</label>
+      </div>
+    </div>
+
+    <div class="panel panel-2">
+      <h2>Iceberg parameters</h2>
+      <div class="presets" id="presets">
+        <button data-ex="A">EX&nbsp;A</button>
+        <button data-ex="B">EX&nbsp;B</button>
+        <button data-ex="C">EX&nbsp;C</button>
+        <button data-ex="D">EX&nbsp;D</button>
+        <button data-ex="E">EX&nbsp;E</button>
+        <button data-ex="F">EX&nbsp;F</button>
+      </div>
+      <div class="fields">
+        <div class="field">
+          <label>Latitude (N)</label>
+          <div class="row"><input id="latDeg" type="number" step="1" inputmode="decimal" aria-label="Latitude degrees"><span class="unit">&deg;</span>
+            <input id="latMin" type="number" step="0.1" inputmode="decimal" aria-label="Latitude minutes"><span class="unit">&prime;</span></div>
+        </div>
+        <div class="field">
+          <label>Longitude (W)</label>
+          <div class="row"><input id="lonDeg" type="number" step="1" inputmode="decimal" aria-label="Longitude degrees"><span class="unit">&deg;</span>
+            <input id="lonMin" type="number" step="0.1" inputmode="decimal" aria-label="Longitude minutes"><span class="unit">&prime;</span></div>
+        </div>
+        <div class="field">
+          <label>Heading</label>
+          <div class="row"><input id="hdg" type="number" step="1" min="0" max="360" inputmode="decimal" aria-label="Heading degrees"><span class="unit">&deg;</span></div>
+        </div>
+        <div class="field">
+          <label>Keel depth</label>
+          <div class="row"><input id="keel" type="number" step="1" inputmode="decimal" aria-label="Keel depth metres"><span class="unit">m</span></div>
+        </div>
+      </div>
+
+      <div class="verdict">
+        <div class="vpill"><div class="k">Surface platforms</div><div class="v" id="vSurface">&mdash;</div></div>
+        <div class="vpill"><div class="k">Subsea assets</div><div class="v" id="vSubsea">&mdash;</div></div>
+      </div>
+      <div class="match" id="match"></div>
+    </div>
+  </div>
+
+  <div class="results">
+    <h2>Assessment</h2>
+    <div class="cards" id="cards"></div>
+  </div>
+
+  <div class="reference">
+    <details>
+      <summary>Rules, platform data &amp; method</summary>
+      <div class="ref-body">
+        <p><strong>Surface platform threat</strong> &mdash; based on the track's closest approach: under 5&nbsp;nm = <strong>red</strong>, 5&ndash;10&nbsp;nm = <strong>yellow</strong>, over 10&nbsp;nm = <strong>green</strong>. Override: if keel depth is 110% or more of the water depth at a platform, the berg grounds first &rarr; <strong>green</strong> regardless of distance.</p>
+        <p><strong>Subsea asset threat</strong> &mdash; only if the track passes within 25&nbsp;nm of the platform (otherwise green, &ldquo;does not intersect&rdquo;). Within range, by keel-to-depth ratio: &ge;110% green (grounds), 90&ndash;110% <strong>red</strong>, 70&ndash;90% <strong>yellow</strong>, under 70% green (keel too shallow).</p>
+        <table class="ref">
+          <thead><tr><th>Platform</th><th>Latitude</th><th>Longitude</th><th>Depth (m)</th></tr></thead>
+          <tbody>
+            <tr><td>Hibernia</td><td>46.7504&deg; N</td><td>48.7819&deg; W</td><td>78</td></tr>
+            <tr><td>Sea Rose</td><td>46.7895&deg; N</td><td>48.146&deg; W</td><td>107</td></tr>
+            <tr><td>Terra Nova</td><td>46.4&deg; N</td><td>48.4&deg; W</td><td>91</td></tr>
+            <tr><td>Hebron</td><td>46.544&deg; N</td><td>48.518&deg; W</td><td>93</td></tr>
+          </tbody>
+        </table>
+        <p>Distance uses 1&prime; latitude = 1&nbsp;nm, with east&ndash;west distance scaled by cos(latitude) (&asymp;0.68 here). The printed competition map has square cells, so a degree of longitude looks the same width as a degree of latitude even though it is only ~41&nbsp;nm versus 60&nbsp;nm &mdash; measuring a diagonal track with a latitude ruler on paper over-counts the east&ndash;west part and can turn a yellow into a red. This console applies the correct longitude scale. Platform values are the updated landscape sheet&rsquo;s decimals, which reproduce all six official example answer keys.</p>
+        <button class="pbtn" onclick="window.print()">Print / save as PDF</button>
+      </div>
+    </details>
+  </div>
+</div>
+
+<script>
+"use strict";
+const PX0=70,PY0=44,PW=560,PH=480,LON_L=-49.6,LON_SPAN=2.0,LAT_T=48.1,LAT_SPAN=1.8;
+const PXNM_LAT=(PH/LAT_SPAN)/60;
+const PLAT=[
+ {name:"Hibernia",lat:46.7504,lon:-48.7819,depth:78,la:"start"},
+ {name:"Sea Rose",lat:46.7895,lon:-48.146,depth:107,la:"start"},
+ {name:"Terra Nova",lat:46.4,lon:-48.4,depth:91,la:"start"},
+ {name:"Hebron",lat:46.544,lon:-48.518,depth:93,la:"start"}
+];
+const EX={
+ A:{latDeg:47,latMin:39,lonDeg:48,lonMin:37,hdg:158,keel:99,ans:{"Hibernia":["G","G"],"Sea Rose":["R","R"],"Terra Nova":["G","R"],"Hebron":["G","R"]}},
+ B:{latDeg:47,latMin:58,lonDeg:48,lonMin:50,hdg:180,keel:78,ans:{"Hibernia":["R","R"],"Sea Rose":["G","G"],"Terra Nova":["G","Y"],"Hebron":["G","Y"]}},
+ C:{latDeg:47,latMin:53,lonDeg:47,lonMin:51,hdg:188,keel:112,ans:{"Hibernia":["G","G"],"Sea Rose":["R","R"],"Terra Nova":["G","G"],"Hebron":["G","G"]}},
+ D:{latDeg:47,latMin:40,lonDeg:49,lonMin:25,hdg:152,keel:60,ans:{"Hibernia":["R","Y"],"Sea Rose":["G","G"],"Terra Nova":["R","G"],"Hebron":["R","G"]}},
+ E:{latDeg:47,latMin:45,lonDeg:48,lonMin:29,hdg:198,keel:84,ans:{"Hibernia":["Y","R"],"Sea Rose":["G","G"],"Terra Nova":["G","G"],"Hebron":["G","R"]}},
+ F:{latDeg:47,latMin:56,lonDeg:47,lonMin:45,hdg:181,keel:126,ans:{"Hibernia":["G","G"],"Sea Rose":["G","G"],"Terra Nova":["G","G"],"Hebron":["G","G"]}}
+};
+let curEx=null, dragMode=null;
+const NS="http://www.w3.org/2000/svg";
+const $=id=>document.getElementById(id);
+const rad=d=>d*Math.PI/180, cosD=d=>Math.cos(rad(d));
+const r1=x=>Math.round(x*10)/10;
+const xPix=lon=>PX0+(lon-LON_L)/LON_SPAN*PW;
+const yPix=lat=>PY0+(LAT_T-lat)/LAT_SPAN*PH;
+const pxnmLon=lat=>(PW/LON_SPAN)/(60*cosD(lat));
+function el(tag,a){const e=document.createElementNS(NS,tag);for(const k in a)e.setAttribute(k,a[k]);return e;}
+
+function dms(deg,min){const m=Math.floor(min);const s=Math.round((min-m)*60);return deg+"\u00B0"+String(m).padStart(2,"0")+"\u2032"+String(s).padStart(2,"0")+"\u2033";}
+
+function drawStatic(){
+  const minor=$("gridMinor"),major=$("gridMajor"),labels=$("labels"),rings=$("rings"),plats=$("platforms");
+  for(let lon=-49.5;lon<=-47.6;lon+=0.25){const x=xPix(lon);
+    minor.appendChild(el("line",{x1:x,y1:PY0,x2:x,y2:PY0+PH,style:"stroke:var(--grid-minor);stroke-width:.5"}));}
+  for(let lat=46.5;lat<=48.05;lat+=0.25){const y=yPix(lat);
+    minor.appendChild(el("line",{x1:PX0,y1:y,x2:PX0+PW,y2:y,style:"stroke:var(--grid-minor);stroke-width:.5"}));}
+  const lonMaj=[[-49.5,"49\u00B030\u2032W"],[-49.0,"49\u00B000\u2032W"],[-48.5,"48\u00B030\u2032W"],[-48.0,"48\u00B000\u2032W"]];
+  const latMaj=[[48.0,"48\u00B000\u2032N"],[47.5,"47\u00B030\u2032N"],[47.0,"47\u00B000\u2032N"],[46.5,"46\u00B030\u2032N"]];
+  lonMaj.forEach(([lon,t])=>{const x=xPix(lon);
+    major.appendChild(el("line",{x1:x,y1:PY0,x2:x,y2:PY0+PH,style:"stroke:var(--grid-major);stroke-width:.75"}));
+    const tx=el("text",{x:x,y:PY0-9,"text-anchor":"middle",style:"fill:var(--lonlat);font-family:var(--mono);font-size:10.5px"});tx.textContent=t;labels.appendChild(tx);});
+  latMaj.forEach(([lat,t])=>{const y=yPix(lat);
+    major.appendChild(el("line",{x1:PX0,y1:y,x2:PX0+PW,y2:y,style:"stroke:var(--grid-major);stroke-width:.75"}));
+    const tx=el("text",{x:PX0+PW+8,y:y+4,style:"fill:var(--lonlat);font-family:var(--mono);font-size:10.5px"});tx.textContent=t;labels.appendChild(tx);});
+  PLAT.forEach(p=>{
+    const px=xPix(p.lon),py=yPix(p.lat),rl=pxnmLon(p.lat);
+    [[25,"var(--ring-sub)",".45"],[10,"var(--ring-amber)",".5"],[5,"var(--ring-red)",".55"]].forEach(([nm,c,o])=>{
+      rings.appendChild(el("ellipse",{cx:px,cy:py,rx:nm*rl,ry:nm*PXNM_LAT,style:"fill:none;stroke:"+c+";stroke-width:.6;stroke-dasharray:3 4;opacity:"+o}));});
+    plats.appendChild(el("circle",{cx:px,cy:py,r:5.5,style:"fill:var(--ink);stroke:var(--marker);stroke-width:1.4"}));
+    plats.appendChild(el("circle",{cx:px,cy:py,r:1.6,style:"fill:var(--marker)"}));
+    const tx=el("text",{x:px+10,y:py+4,style:"fill:var(--marker-label);font-family:var(--sans);font-size:13px;font-weight:600"});
+    tx.textContent=p.name;plats.appendChild(tx);
+  });
+}
+
+function styleFor(l){return l==="R"?{c:"R",t:"Red"}:l==="Y"?{c:"Y",t:"Yellow"}:{c:"G",t:"Green"};}
+function rayExit(bx,by,dx,dy){
+  let best=1e9;const x0=PX0,x1=PX0+PW,y0=PY0,y1=PY0+PH,eps=0.01;
+  function test(t){if(t>eps&&t<best){const X=bx+dx*t,Y=by+dy*t;if(X>=x0-1&&X<=x1+1&&Y>=y0-1&&Y<=y1+1)best=t;}}
+  if(Math.abs(dx)>1e-9){test((x0-bx)/dx);test((x1-bx)/dx);}
+  if(Math.abs(dy)>1e-9){test((y0-by)/dy);test((y1-by)/dy);}
+  if(best>=1e9)best=0;return{x:bx+dx*best,y:by+dy*best,t:best};
+}
+
+function recompute(){
+  const latDeg=+$("latDeg").value||0,latMin=+$("latMin").value||0,lonDeg=+$("lonDeg").value||0,lonMin=+$("lonMin").value||0;
+  const hdg=((+$("hdg").value||0)%360+360)%360,keel=+$("keel").value||0;
+  const lat=latDeg+latMin/60,lon=-(lonDeg+lonMin/60);
+  const bx=xPix(lon),by=yPix(lat);
+  const dE=Math.sin(rad(hdg)),dN=Math.cos(rad(hdg));
+  const dirx=dE*pxnmLon(lat),diry=-dN*PXNM_LAT;
+  const exit=rayExit(bx,by,dirx,diry);
+  const dyn=$("dyn");dyn.textContent="";
+  const showLeaders=$("tgLeaders").checked;
+
+  const res={};let sR=0,sY=0,bR=0,bY=0;
+  PLAT.forEach(p=>{
+    const cr=cosD((lat+p.lat)/2);
+    const qx=(p.lon-lon)*60*cr,qy=(p.lat-lat)*60;
+    const t=qx*dE+qy*dN;
+    let dist,cpLat,cpLon;
+    if(t<0){dist=Math.hypot(qx,qy);cpLat=lat;cpLon=lon;}
+    else{dist=Math.abs(qx*dN-qy*dE);cpLat=lat+dN*t/60;cpLon=lon+dE*t/(60*cr);}
+    const ratio=keel/p.depth;
+    let pl,plR;
+    if(ratio>=1.10){pl="G";plR="grounds before platform";}
+    else if(dist<5){pl="R";plR="within 5 nm";}
+    else if(dist<=10){pl="Y";plR="5\u201310 nm";}
+    else{pl="G";plR="beyond 10 nm";}
+    let sb,sbR;
+    if(dist>25){sb="G";sbR="track >25 nm away";}
+    else if(ratio>=1.10){sb="G";sbR="keel grounds (\u2265110%)";}
+    else if(ratio<0.70){sb="G";sbR="keel <70% of depth";}
+    else if(ratio>=0.90){sb="R";sbR="keel 90\u2013110% of depth";}
+    else{sb="Y";sbR="keel 70\u201390% of depth";}
+    res[p.name]={pl,sb,dist,ratio,plR,sbR};
+    if(pl==="R")sR++;else if(pl==="Y")sY++;
+    if(sb==="R")bR++;else if(sb==="Y")bY++;
+    if(showLeaders){
+      const lx=xPix(p.lon),ly=yPix(p.lat),cx=xPix(cpLon),cy=yPix(cpLat);
+      dyn.appendChild(el("line",{x1:lx,y1:ly,x2:cx,y2:cy,style:"stroke:var(--leader);stroke-width:.9;stroke-dasharray:3 3"}));
+      dyn.appendChild(el("circle",{cx:cx,cy:cy,r:2.4,style:"fill:var(--leader)"}));
+      const mx=(lx+cx)/2,my=(ly+cy)/2,txt=dist.toFixed(1)+" nm",w=txt.length*6.2+8;
+      dyn.appendChild(el("rect",{x:mx-w/2,y:my-9,width:w,height:15,rx:4,style:"fill:var(--leader-bg);stroke:var(--leader);stroke-width:.5;opacity:.92"}));
+      const tt=el("text",{x:mx,y:my+2.5,"text-anchor":"middle",style:"fill:var(--text);font-family:var(--mono);font-size:10.5px"});
+      tt.textContent=txt;dyn.appendChild(tt);
+    }
+  });
+
+  dyn.appendChild(el("line",{x1:bx,y1:by,x2:exit.x,y2:exit.y,style:"stroke:var(--ice-glow);stroke-width:7;stroke-linecap:round;opacity:.45"}));
+  dyn.appendChild(el("line",{x1:bx,y1:by,x2:exit.x,y2:exit.y,style:"stroke:var(--track);stroke-width:2;stroke-linecap:round"}));
+  const ang=Math.atan2(diry,dirx)*180/Math.PI;
+  const head=el("g",{transform:"translate("+exit.x+","+exit.y+") rotate("+ang+")"});
+  head.appendChild(el("path",{d:"M0 0 L-12 -5 L-12 5 Z",style:"fill:var(--track)"}));
+  dyn.appendChild(head);
+  const hx=bx+dirx*exit.t*0.55,hy=by+diry*exit.t*0.55;
+  const handle=el("circle",{cx:hx,cy:hy,r:7,"data-drag":"head",style:"fill:var(--track);opacity:.0001;cursor:grab"});
+  dyn.appendChild(el("circle",{cx:hx,cy:hy,r:4,style:"fill:var(--ink);stroke:var(--track);stroke-width:1.5"}));
+  dyn.appendChild(handle);
+  dyn.appendChild(el("circle",{cx:bx,cy:by,r:11,class:"pulse",style:"fill:var(--ice)"}));
+  dyn.appendChild(el("circle",{cx:bx,cy:by,r:5.5,style:"fill:var(--ice);stroke:var(--ink);stroke-width:1.5"}));
+  dyn.appendChild(el("circle",{cx:bx,cy:by,r:13,"data-drag":"berg",style:"fill:transparent;cursor:move"}));
+  const bl=el("text",{x:bx,y:by-13,"text-anchor":"middle",style:"fill:var(--ice);font-family:var(--mono);font-size:12px;font-weight:600"});
+  bl.textContent="BERG";dyn.appendChild(bl);
+
+  $("metaPos").textContent=dms(latDeg,latMin)+" N   "+dms(lonDeg,lonMin)+" W";
+  $("metaHK").textContent="HDG "+Math.round(hdg)+"\u00B0   KEEL "+Math.round(keel)+" m";
+  $("vSurface").textContent=worst(sR,sY,"clear");
+  $("vSubsea").textContent=worst(bR,bY,"clear");
+  renderCards(res);
+  updateMatch(res);
+}
+function worst(r,y,clearWord){
+  if(r>0)return r+" red"+(y?" / "+y+" yellow":"");
+  if(y>0)return y+" yellow";
+  return "all green";
+}
+function renderCards(res){
+  const c=$("cards");c.textContent="";
+  PLAT.forEach(p=>{
+    const d=res[p.name];
+    const card=document.createElement("div");card.className="card";
+    card.innerHTML=
+      '<div class="cn"><span class="name">'+p.name+'</span><span class="depth">'+p.depth+' m</span></div>'+
+      '<div class="threatline"><span class="lbl">Surface</span><span class="badge b-'+d.pl+'">'+styleFor(d.pl).t+'</span></div>'+
+      '<div class="threatline"><span class="lbl">Subsea</span><span class="badge b-'+d.sb+'">'+styleFor(d.sb).t+'</span></div>'+
+      '<div class="foot">Closest approach '+d.dist.toFixed(1)+' nm &middot; keel '+Math.round(d.ratio*100)+'% of depth<br>'+
+      'Surface: '+d.plR+'<br>Subsea: '+d.sbR+'</div>';
+    c.appendChild(card);
+  });
+}
+function updateMatch(res){
+  const m=$("match");
+  if(!curEx||!EX[curEx]){m.style.display="none";return;}
+  const ans=EX[curEx].ans;let ok=0;
+  PLAT.forEach(p=>{if(res[p.name].pl===ans[p.name][0])ok++;if(res[p.name].sb===ans[p.name][1])ok++;});
+  m.style.display="block";
+  if(ok===8){m.style.background="var(--green-bg)";m.style.color="var(--green-tx)";m.textContent="\u2713 Matches official Example "+curEx+" answer key (8/8).";}
+  else{m.style.background="var(--amber-bg)";m.style.color="var(--amber-tx)";m.textContent="Example "+curEx+": "+ok+"/8 cells match.";}
+}
+function setLatLon(lat,lon){
+  lat=Math.max(LAT_T-LAT_SPAN,Math.min(LAT_T,lat));
+  lon=Math.max(LON_L,Math.min(LON_L+LON_SPAN,lon));
+  const ad=Math.floor(lat);$("latDeg").value=ad;$("latMin").value=r1((lat-ad)*60);
+  const aL=-lon,od=Math.floor(aL);$("lonDeg").value=od;$("lonMin").value=r1((aL-od)*60);
+}
+function loadEx(k){const e=EX[k];curEx=k;
+  $("latDeg").value=e.latDeg;$("latMin").value=e.latMin;$("lonDeg").value=e.lonDeg;$("lonMin").value=e.lonMin;$("hdg").value=e.hdg;$("keel").value=e.keel;
+  document.querySelectorAll("#presets button").forEach(b=>b.classList.toggle("active",b.dataset.ex===k));
+  recompute();}
+function clearPreset(){curEx=null;document.querySelectorAll("#presets button").forEach(b=>b.classList.remove("active"));}
+
+const svg=$("chart");
+function svgPoint(evt){const pt=svg.createSVGPoint();pt.x=evt.clientX;pt.y=evt.clientY;return pt.matrixTransform(svg.getScreenCTM().inverse());}
+function curLatLon(){const lat=(+$("latDeg").value||0)+(+$("latMin").value||0)/60;const lon=-((+$("lonDeg").value||0)+(+$("lonMin").value||0)/60);return{lat,lon};}
+svg.addEventListener("pointerdown",e=>{
+  const dt=e.target.getAttribute&&e.target.getAttribute("data-drag");
+  const u=svgPoint(e);
+  if(dt==="head"){dragMode="head";svg.setPointerCapture(e.pointerId);clearPreset();return;}
+  if(dt==="berg"){dragMode="berg";svg.setPointerCapture(e.pointerId);clearPreset();return;}
+  if(u.x>=PX0&&u.x<=PX0+PW&&u.y>=PY0&&u.y<=PY0+PH){
+    clearPreset();
+    setLatLon(LAT_T-(u.y-PY0)/PH*LAT_SPAN, LON_L+(u.x-PX0)/PW*LON_SPAN);recompute();
+  }
+});
+svg.addEventListener("pointermove",e=>{
+  if(!dragMode)return;const u=svgPoint(e);
+  if(dragMode==="berg"){
+    setLatLon(LAT_T-(u.y-PY0)/PH*LAT_SPAN, LON_L+(u.x-PX0)/PW*LON_SPAN);recompute();
+  }else if(dragMode==="head"){
+    const {lat,lon}=curLatLon();const bx=xPix(lon),by=yPix(lat);
+    const dxp=u.x-bx,dyp=u.y-by;
+    const east=dxp/pxnmLon(lat),north=-dyp/PXNM_LAT;
+    let h=Math.atan2(east,north)*180/Math.PI;h=(h%360+360)%360;
+    $("hdg").value=Math.round(h);recompute();
+  }
+});
+function endDrag(e){if(dragMode){try{svg.releasePointerCapture(e.pointerId);}catch(_){}}dragMode=null;}
+svg.addEventListener("pointerup",endDrag);
+svg.addEventListener("pointercancel",endDrag);
+
+document.querySelectorAll("#presets button").forEach(b=>b.addEventListener("click",()=>loadEx(b.dataset.ex)));
+["latDeg","latMin","lonDeg","lonMin","hdg","keel"].forEach(id=>$(id).addEventListener("input",()=>{clearPreset();recompute();}));
+$("tgRings").addEventListener("change",()=>{$("rings").style.display=$("tgRings").checked?"":"none";});
+$("tgLeaders").addEventListener("change",recompute);
+
+drawStatic();
+loadEx("A");
+</script>
+</body>
+</html>
