@@ -365,8 +365,6 @@ function mixThrusters(j){
   const vertical = clamp(j.vertical||0,-1,1);
   const roll = clamp(j.roll||0,-1,1);
 
-  const yw = y > 0.05 ? -yaw : yaw;
-
   let fl = -y + yaw + x;
   let fr = -y - yaw - x;
   let rl = -y + yaw - x;
