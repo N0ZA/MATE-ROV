@@ -901,9 +901,15 @@
   let teensyTimeout = null;
   let camZooms = [1.0, 1.0, 1.0, 1.0, 1.0];
   let selectedCam = 0;
+  let camOrder = [2, 3, 4, 5];
+  let captureKey = 'a';
 
   socket.on('disconnect', () => {
     clearTimeout(teensyTimeout);
+  });
+
+  socket.on('cam-order', (order) => {
+    camOrder = order;
   });
 
   socket.on('cam-restart', ({ cam }) => {
@@ -1600,10 +1606,12 @@
     try {
       const res = await fetch('/api/capture-key');
       const data = await res.json();
+      captureKey = data.key || 'a';
       const btn = document.getElementById('captureKeyBtn');
       if (btn) btn.textContent = data.key || 'F9';
     } catch {}
   }
+  loadCaptureKey();
 
   let _captureKeyHandler = null;
 
@@ -1939,6 +1947,16 @@
   document.addEventListener('keydown', e => { pressedKeys.add(e.code); });
   document.addEventListener('keyup',   e => { pressedKeys.delete(e.code); });
 
+  document.addEventListener('keydown', (e) => {
+    if (isSettingsOpen() || remapTarget !== null) return;
+    const tag = e.target.tagName;
+    if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+    const key = e.key === ' ' ? 'Space' : e.key;
+    if (key === 'b' || key === 'B') { e.preventDefault(); socket.emit('remote-capture-frame'); return; }
+    if (key === 'c' || key === 'C') { e.preventDefault(); socket.emit('remote-run-inference'); return; }
+    if (key === captureKey) { e.preventDefault(); socket.emit('toggle-capture'); }
+  });
+
   /* ============ GAMEPAD ============ */
   function scaleAxis(raw, offset) {
     if (raw === offset) return 0;
@@ -2121,11 +2139,13 @@
         const bL1=bp('btnLight1'), bL2=bp('btnLight2'), bL3=bp('btnLight3'), bL4=bp('btnLight4');
         if (bL1 && !light1Was) toggleLight(1);
         if (bL2 && !light2Was) toggleLight(2);
-        // bL3/bL4: arm1 rotate hold (CW / CCW). When arm controller absent, drive rotate directly.
+        // bL3/bL4: right arm (arm1) rotate hold buttons — pressed/held drives the wrist to a
+        // fixed PWM, released snaps back to neutral. When arm controller absent, drive rotate directly.
         if (!armGp) {
           const arm1RotEl = document.getElementById('arm1_rotate');
-          if (bL3 && !bL4)                          { arm1RotEl.value = armRange['arm1_rotate'].max; updateArmValue('arm1_rotate'); emitArmControls(); }
-          else if (bL4 && !bL3)                     { arm1RotEl.value = armRange['arm1_rotate'].min; updateArmValue('arm1_rotate'); emitArmControls(); }
+          const armRot1 = armRange['arm1_rotate'];
+          if (bL3 && !bL4)                          { arm1RotEl.value = clamp(1100, armRot1.min, armRot1.max); updateArmValue('arm1_rotate'); emitArmControls(); }
+          else if (bL4 && !bL3)                     { arm1RotEl.value = clamp(1900, armRot1.min, armRot1.max); updateArmValue('arm1_rotate'); emitArmControls(); }
           else if ((light3Was || light4Was) && !bL3 && !bL4) { arm1RotEl.value = 1500; updateArmValue('arm1_rotate'); emitArmControls(); }
         }
         light1Was=bL1; light2Was=bL2; light3Was=bL3; light4Was=bL4;
@@ -2220,11 +2240,13 @@
         const bL1=kbp('btnLight1'), bL2=kbp('btnLight2'), bL3=kbp('btnLight3'), bL4=kbp('btnLight4');
         if (bL1 && !light1Was) toggleLight(1);
         if (bL2 && !light2Was) toggleLight(2);
-        // bL3/bL4: arm1 rotate hold (CW / CCW). When arm controller absent, drive rotate directly.
+        // bL3/bL4: right arm (arm1) rotate hold buttons — pressed/held drives the wrist to a
+        // fixed PWM, released snaps back to neutral. When arm controller absent, drive rotate directly.
         if (!armGp) {
           const arm1RotEl = document.getElementById('arm1_rotate');
-          if (bL3 && !bL4)                          { arm1RotEl.value = armRange['arm1_rotate'].max; updateArmValue('arm1_rotate'); emitArmControls(); }
-          else if (bL4 && !bL3)                     { arm1RotEl.value = armRange['arm1_rotate'].min; updateArmValue('arm1_rotate'); emitArmControls(); }
+          const armRot1 = armRange['arm1_rotate'];
+          if (bL3 && !bL4)                          { arm1RotEl.value = clamp(1100, armRot1.min, armRot1.max); updateArmValue('arm1_rotate'); emitArmControls(); }
+          else if (bL4 && !bL3)                     { arm1RotEl.value = clamp(1900, armRot1.min, armRot1.max); updateArmValue('arm1_rotate'); emitArmControls(); }
           else if ((light3Was || light4Was) && !bL3 && !bL4) { arm1RotEl.value = 1500; updateArmValue('arm1_rotate'); emitArmControls(); }
         }
         light1Was=bL1; light2Was=bL2; light3Was=bL3; light4Was=bL4;
@@ -2276,15 +2298,19 @@
 
         // Right arm rotate: hold direction button to spin, release to stop.
         // Squeeze R2 for proportional speed; release R2 alone defaults to full speed.
-        // btnLight3/4 also drive arm1 rotate CW/CCW as hold buttons.
         const r2Value  = readBtnValueBinding(armBindings.btnR2Mod, armGp, gp, armGp);
         const r1Speed  = r2Value > 0.05 ? r2Value : 1.0;
-        const rotCCW   = readBtnBinding(armBindings.btnArm1RotateCCW, armGp, gp, armGp)
-                       || readBtnBinding(bindings.btnLight4, gp, gp, armGp);
-        const rotCW    = readBtnBinding(armBindings.btnArm1RotateCW,  armGp, gp, armGp)
-                       || readBtnBinding(bindings.btnLight3, gp, gp, armGp);
-        const arm1RotPwm = rotCCW ? Math.round(1500 - r1Speed * 500)
-                         : rotCW  ? Math.round(1500 + r1Speed * 500) : 1500;
+        const rotCCW   = readBtnBinding(armBindings.btnArm1RotateCCW, armGp, gp, armGp);
+        const rotCW    = readBtnBinding(armBindings.btnArm1RotateCW,  armGp, gp, armGp);
+        // btnLight3/4 are separate hold buttons that snap the wrist to a fixed PWM
+        // (1100 / 1900) rather than spinning proportionally — they take priority
+        // over the D-pad proportional-spin buttons above.
+        const bLight3 = readBtnBinding(bindings.btnLight3, gp, gp, armGp);
+        const bLight4 = readBtnBinding(bindings.btnLight4, gp, gp, armGp);
+        const arm1RotPwm = (bLight3 && !bLight4) ? 1100
+                          : (bLight4 && !bLight3) ? 1900
+                          : rotCCW ? Math.round(1500 - r1Speed * 500)
+                          : rotCW  ? Math.round(1500 + r1Speed * 500) : 1500;
         setArmSlider('arm1_rotate', clamp(arm1RotPwm, armRange['arm1_rotate'].min, armRange['arm1_rotate'].max));
 
         // Left arm rotate: hold direction button to spin, release to stop.
@@ -2302,8 +2328,7 @@
         const bCamZoomIn  = readBtnBinding(armBindings.btnCamZoomIn,  armGp, gp, armGp);
         const bCamZoomOut = readBtnBinding(armBindings.btnCamZoomOut, armGp, gp, armGp);
         if (bCamSel && !optionsBtnWas) {
-          const CW_CAMS = [2, 3, 5, 4];
-          selectedCam = CW_CAMS[(CW_CAMS.indexOf(selectedCam) + 1) % CW_CAMS.length];
+          selectedCam = camOrder[(camOrder.indexOf(selectedCam) + 1) % camOrder.length];
           emitCamZoomState();
         }
         if (bCamZoomIn && !camZoomInWas && selectedCam > 0) {

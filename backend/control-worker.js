@@ -35,7 +35,7 @@ function clamp(v, min, max) { return Math.max(min, Math.min(max, v)); }
 //   sign      = flip if rotating makes the jaws creep the wrong way
 //   0.0       = disable coupling for that arm (treat motors as independent)
 // =====================================================
-const ARM1_WRIST_COUPLE = -1.0;
+const ARM1_WRIST_COUPLE = 1.0;
 const ARM2_WRIST_COUPLE = -1.0;
 
 function mixWrist(rotatePwm, gripperPwm, couple) {
