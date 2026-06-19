@@ -2139,15 +2139,8 @@
         const bL1=bp('btnLight1'), bL2=bp('btnLight2'), bL3=bp('btnLight3'), bL4=bp('btnLight4');
         if (bL1 && !light1Was) toggleLight(1);
         if (bL2 && !light2Was) toggleLight(2);
-        // bL3/bL4: right arm (arm1) rotate hold buttons — pressed/held drives the wrist to a
-        // fixed PWM, released snaps back to neutral. When arm controller absent, drive rotate directly.
-        if (!armGp) {
-          const arm1RotEl = document.getElementById('arm1_rotate');
-          const armRot1 = armRange['arm1_rotate'];
-          if (bL3 && !bL4)                          { arm1RotEl.value = clamp(1100, armRot1.min, armRot1.max); updateArmValue('arm1_rotate'); emitArmControls(); }
-          else if (bL4 && !bL3)                     { arm1RotEl.value = clamp(1900, armRot1.min, armRot1.max); updateArmValue('arm1_rotate'); emitArmControls(); }
-          else if ((light3Was || light4Was) && !bL3 && !bL4) { arm1RotEl.value = 1500; updateArmValue('arm1_rotate'); emitArmControls(); }
-        }
+        if (bL3 && !light3Was) toggleLight(3);
+        if (bL4 && !light4Was) toggleLight(4);
         light1Was=bL1; light2Was=bL2; light3Was=bL3; light4Was=bL4;
 
         let surge = 0, sway = 0, pitch = 0, roll = 0, yaw = 0;
@@ -2240,15 +2233,8 @@
         const bL1=kbp('btnLight1'), bL2=kbp('btnLight2'), bL3=kbp('btnLight3'), bL4=kbp('btnLight4');
         if (bL1 && !light1Was) toggleLight(1);
         if (bL2 && !light2Was) toggleLight(2);
-        // bL3/bL4: right arm (arm1) rotate hold buttons — pressed/held drives the wrist to a
-        // fixed PWM, released snaps back to neutral. When arm controller absent, drive rotate directly.
-        if (!armGp) {
-          const arm1RotEl = document.getElementById('arm1_rotate');
-          const armRot1 = armRange['arm1_rotate'];
-          if (bL3 && !bL4)                          { arm1RotEl.value = clamp(1100, armRot1.min, armRot1.max); updateArmValue('arm1_rotate'); emitArmControls(); }
-          else if (bL4 && !bL3)                     { arm1RotEl.value = clamp(1900, armRot1.min, armRot1.max); updateArmValue('arm1_rotate'); emitArmControls(); }
-          else if ((light3Was || light4Was) && !bL3 && !bL4) { arm1RotEl.value = 1500; updateArmValue('arm1_rotate'); emitArmControls(); }
-        }
+        if (bL3 && !light3Was) toggleLight(3);
+        if (bL4 && !light4Was) toggleLight(4);
         light1Was=bL1; light2Was=bL2; light3Was=bL3; light4Was=bL4;
       }
     }
@@ -2302,14 +2288,7 @@
         const r1Speed  = r2Value > 0.05 ? r2Value : 1.0;
         const rotCCW   = readBtnBinding(armBindings.btnArm1RotateCCW, armGp, gp, armGp);
         const rotCW    = readBtnBinding(armBindings.btnArm1RotateCW,  armGp, gp, armGp);
-        // btnLight3/4 are separate hold buttons that snap the wrist to a fixed PWM
-        // (1100 / 1900) rather than spinning proportionally — they take priority
-        // over the D-pad proportional-spin buttons above.
-        const bLight3 = readBtnBinding(bindings.btnLight3, gp, gp, armGp);
-        const bLight4 = readBtnBinding(bindings.btnLight4, gp, gp, armGp);
-        const arm1RotPwm = (bLight3 && !bLight4) ? 1100
-                          : (bLight4 && !bLight3) ? 1900
-                          : rotCCW ? Math.round(1500 - r1Speed * 500)
+        const arm1RotPwm = rotCCW ? Math.round(1500 - r1Speed * 500)
                           : rotCW  ? Math.round(1500 + r1Speed * 500) : 1500;
         setArmSlider('arm1_rotate', clamp(arm1RotPwm, armRange['arm1_rotate'].min, armRange['arm1_rotate'].max));
 

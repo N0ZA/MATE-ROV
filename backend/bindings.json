@@ -30,7 +30,7 @@
   "btnDisarm": 9,
   "btnLight1": -1,
   "btnLight2": -1,
-  "btnLight3": "arm:2",
-  "btnLight4": "arm:1",
+  "btnLight3": -1,
+  "btnLight4": -1,
   "btnStabilize": 1
 }
