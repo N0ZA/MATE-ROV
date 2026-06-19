@@ -201,6 +201,11 @@ app.post('/api/capture-key', (req, res) => {
   res.json({ ok: true });
 });
 
+app.get('/api/check-usb', (req, res) => {
+  const usbPath = getUsbPath();
+  res.json({ available: !!usbPath, path: usbPath });
+});
+
 
 /* ================= CAM MJPEG ================= */
 const camClients2 = new Set();
@@ -404,29 +409,50 @@ const CAM_RTSP = {
   5: 'rtsp://admin:Admin123@192.168.2.15:554/live/0/SUB',
 };
 
-let captureProc   = null;
-let captureCount  = 0;
-let captureActive = false;
+let captureProc      = null;
+let captureCount     = 0;
+let captureActive    = false;
+let captureOutputDir = null;
 
-function startCapture() {
+function getUsbPath() {
+  const mediaBase = '/media/orin';
+  try {
+    for (const entry of fs.readdirSync(mediaBase)) {
+      const full = join(mediaBase, entry);
+      try { if (fs.statSync(full).isDirectory()) return full; } catch {}
+    }
+  } catch {}
+  return null;
+}
+
+function startCapture(outputDir) {
   if (captureActive) return;
-  captureActive = true;
-  captureCount  = 0;
+  captureActive    = true;
+  captureCount     = 0;
+  captureOutputDir = outputDir;
   const script = join(__dirname, '../scripts/capture_dataset_metashape.py');
 
   const { selectedCam, camZooms } = latestCamZoomState;
   const rtspUrl = CAM_RTSP[selectedCam] || CAM_RTSP[2];
   const zoom    = (selectedCam > 0 && camZooms) ? (camZooms[selectedCam - 1] || 1.0) : 1.0;
   console.log(`📸 Capturing from cam${selectedCam || 2} zoom×${zoom}  ${rtspUrl}`);
+  console.log(`📸 Output: ${outputDir}`);
 
-  captureProc = spawn('python3', ['-u', script, '--rtsp-url', rtspUrl, '--zoom', String(zoom)]);
+  const spawnArgs = ['-u', script, '--rtsp-url', rtspUrl, '--zoom', String(zoom)];
+  if (outputDir) spawnArgs.push('--output-dir', outputDir);
+
+  captureProc = spawn('python3', spawnArgs);
   captureProc.stdout.on('data', (data) => {
     for (const line of data.toString().trim().split('\n')) {
       if (line.startsWith('DONE:')) {
-        captureCount  = parseInt(line.split(':')[1]) || captureCount;
-        captureActive = false;
-        captureProc   = null;
+        const parts   = line.split(':');
+        captureCount  = parseInt(parts[1]) || captureCount;
+        const doneDir = parts.slice(2).join(':') || captureOutputDir || '';
+        captureActive    = false;
+        captureProc      = null;
+        captureOutputDir = null;
         io.emit('capture-status', { active: false, count: captureCount });
+        io.emit('capture-done', { count: captureCount, outputDir: doneDir });
       } else {
         const n = parseInt(line);
         if (!isNaN(n)) {
@@ -437,9 +463,12 @@ function startCapture() {
     }
   });
   captureProc.on('exit', () => {
-    captureActive = false;
-    captureProc   = null;
-    io.emit('capture-status', { active: false, count: captureCount });
+    if (captureActive) {
+      captureActive    = false;
+      captureProc      = null;
+      captureOutputDir = null;
+      io.emit('capture-status', { active: false, count: captureCount });
+    }
   });
   io.emit('capture-status', { active: true, count: 0 });
   console.log('📸 Dataset capture started');
@@ -447,7 +476,8 @@ function startCapture() {
 
 function stopCapture() {
   if (captureProc) { captureProc.kill('SIGTERM'); captureProc = null; }
-  captureActive = false;
+  captureActive    = false;
+  captureOutputDir = null;
   io.emit('capture-status', { active: false, count: captureCount });
   console.log(`📸 Dataset capture stopped — ${captureCount} frames`);
 }
@@ -539,8 +569,18 @@ io.on('connection', socket=>{
   });
 
   socket.on('toggle-capture', () => {
-    if (!captureActive) startCapture();
-    else stopCapture();
+    if (captureActive) stopCapture();
+  });
+
+  socket.on('start-capture', ({ useUsb }) => {
+    if (captureActive) return;
+    const usbPath = useUsb ? getUsbPath() : null;
+    const now = new Date();
+    const pad = n => String(n).padStart(2, '0');
+    const ts  = `${now.getFullYear()}${pad(now.getMonth()+1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+    const baseDir   = usbPath ? join(usbPath, 'dataset') : join(__dirname, '../dataset');
+    const outputDir = join(baseDir, `metashape_${ts}`);
+    startCapture(outputDir);
   });
 });
 
@@ -565,6 +605,25 @@ app.post('/api/capture-frame', (req, res) => {
   const base64 = image.replace(/^data:image\/\w+;base64,/, '');
   fs.writeFileSync(CAPTURE_PATH, Buffer.from(base64, 'base64'));
   res.json({ ok: true });
+});
+
+app.options('/api/save-snapshot', (req, res) => { CRAB_CORS(res); res.sendStatus(204); });
+
+app.post('/api/save-snapshot', (req, res) => {
+  CRAB_CORS(res);
+  const { image, cam } = req.body;
+  if (!image) return res.status(400).json({ ok: false, error: 'no image' });
+  const now = new Date();
+  const pad = n => String(n).padStart(2, '0');
+  const ts  = `${now.getFullYear()}${pad(now.getMonth()+1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+  const datasetDir = join(__dirname, '../dataset');
+  if (!fs.existsSync(datasetDir)) fs.mkdirSync(datasetDir, { recursive: true });
+  const filename = `snapshot_${ts}${cam ? `_cam${cam}` : ''}.png`;
+  const filepath = join(datasetDir, filename);
+  const base64   = image.replace(/^data:image\/\w+;base64,/, '');
+  fs.writeFileSync(filepath, Buffer.from(base64, 'base64'));
+  console.log(`📸 Snapshot saved: ${filename}`);
+  res.json({ ok: true, filename });
 });
 
 app.post('/api/infer-crabs', (req, res) => {

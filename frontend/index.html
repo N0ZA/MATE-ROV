@@ -181,6 +181,26 @@
     /* Theme color pickers */
     .theme-picker-row { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--bg2); }
     .theme-picker-row input[type="color"] { width: 44px; height: 32px; border: 1px solid var(--p1); border-radius: 4px; background: none; cursor: pointer; padding: 2px; }
+
+    /* ====== CAPTURE POPUPS ====== */
+    .capture-backdrop { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 490; }
+    .capture-backdrop.open { display: block; }
+    .capture-popup { display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 491; background: var(--bg1); border: 2px solid var(--s); border-radius: 12px; padding: 28px 28px 22px; min-width: 380px; max-width: 500px; text-align: center; box-shadow: 0 0 50px rgba(196,181,253,0.25); }
+    .capture-popup.open { display: block; }
+    .capture-popup-icon { font-size: 28px; margin-bottom: 8px; }
+    .capture-popup-title { font-size: 13px; font-weight: bold; color: var(--s); text-transform: uppercase; letter-spacing: 2px; margin-bottom: 14px; }
+    .capture-popup-body { font-size: 13px; color: var(--s1); line-height: 1.65; margin-bottom: 8px; }
+    .capture-popup-path { font-family: Consolas, monospace; font-size: 11px; color: #facc15; word-break: break-all; margin: 8px 0 20px; padding: 8px 10px; background: var(--bg3); border-radius: 6px; border: 1px solid var(--p); text-align: left; }
+    .capture-popup-btns { display: flex; gap: 10px; justify-content: center; }
+    .capture-popup-btn { padding: 8px 22px; border-radius: 6px; border: 1px solid; cursor: pointer; font-size: 13px; font-weight: bold; letter-spacing: 0.5px; text-transform: uppercase; }
+    .capture-popup-btn-start { background: #16a34a; border-color: #22c55e; color: #fff; box-shadow: 0 0 10px rgba(34,197,94,0.3); }
+    .capture-popup-btn-start:hover { background: #15803d; }
+    .capture-popup-btn-cancel { background: var(--bg2); border-color: var(--p1); color: var(--s1); }
+    .capture-popup-btn-cancel:hover { border-color: #ef4444; color: #ef4444; }
+    .capture-popup-btn-close { background: var(--p); border-color: var(--s); color: var(--s); }
+    .capture-popup-btn-close:hover { background: var(--p1); }
+    .capture-done-count { font-size: 32px; font-weight: bold; color: #22c55e; font-family: Consolas, monospace; margin: 8px 0; }
+    .capture-done-dismiss { font-size: 11px; color: var(--p1); margin-top: 12px; }
   </style>
 </head>
 <body>
@@ -1954,7 +1974,7 @@
     const key = e.key === ' ' ? 'Space' : e.key;
     if (key === 'b' || key === 'B') { e.preventDefault(); socket.emit('remote-capture-frame'); return; }
     if (key === 'c' || key === 'C') { e.preventDefault(); socket.emit('remote-run-inference'); return; }
-    if (key === captureKey) { e.preventDefault(); socket.emit('toggle-capture'); }
+    if (key === captureKey) { e.preventDefault(); if (isCaptureActive) socket.emit('toggle-capture'); else triggerCaptureStart(); }
   });
 
   /* ============ GAMEPAD ============ */
@@ -2512,6 +2532,116 @@
   updateThrusters();
   emitArmControls();
 
+  /* ============ DATASET CAPTURE POPUPS ============ */
+  let isCaptureActive = false;
+  let _captureDoneTimer = null;
+
+  socket.on('capture-status', ({ active }) => { isCaptureActive = active; });
+
+  socket.on('capture-done', ({ count, outputDir }) => {
+    showCaptureDonePopup(count, outputDir);
+  });
+
+  function showCaptureStartPopup(usbAvailable, usbPath) {
+    const backdrop = document.getElementById('capture-backdrop');
+    const popup    = document.getElementById('capture-start-popup');
+    const icon     = document.getElementById('csp-icon');
+    const body     = document.getElementById('csp-body');
+    const path     = document.getElementById('csp-path');
+    const startBtn = document.getElementById('csp-start-btn');
+
+    if (usbAvailable && usbPath) {
+      icon.textContent = '💾';
+      body.textContent = 'USB drive detected. Dataset will be saved to the USB drive.';
+      path.textContent = usbPath + '/dataset/metashape_<timestamp>';
+      startBtn.dataset.useUsb = 'true';
+    } else {
+      icon.textContent = '💿';
+      body.textContent = 'No USB drive connected. Dataset will be saved locally.';
+      path.textContent = '/home/orin/MATE-ROV/dataset/metashape_<timestamp>';
+      startBtn.dataset.useUsb = 'false';
+    }
+
+    backdrop.classList.add('open');
+    popup.classList.add('open');
+  }
+
+  function hideCaptureStartPopup() {
+    document.getElementById('capture-backdrop').classList.remove('open');
+    document.getElementById('capture-start-popup').classList.remove('open');
+  }
+
+  function confirmCaptureStart() {
+    const startBtn = document.getElementById('csp-start-btn');
+    const useUsb   = startBtn.dataset.useUsb === 'true';
+    hideCaptureStartPopup();
+    socket.emit('start-capture', { useUsb });
+  }
+
+  function showCaptureDonePopup(count, outputDir) {
+    const backdrop = document.getElementById('capture-done-backdrop');
+    const popup    = document.getElementById('capture-done-popup');
+    document.getElementById('cdp-count').textContent   = count + ' frames';
+    document.getElementById('cdp-path').textContent    = outputDir || 'dataset folder';
+    document.getElementById('cdp-dismiss').textContent = 'Closes in 6s';
+
+    backdrop.classList.add('open');
+    popup.classList.add('open');
+
+    if (_captureDoneTimer) clearInterval(_captureDoneTimer);
+    let remaining = 6;
+    _captureDoneTimer = setInterval(() => {
+      remaining--;
+      const el = document.getElementById('cdp-dismiss');
+      if (el) el.textContent = remaining > 0 ? `Closes in ${remaining}s` : '';
+      if (remaining <= 0) { clearInterval(_captureDoneTimer); _captureDoneTimer = null; hideCaptureDonePopup(); }
+    }, 1000);
+  }
+
+  function hideCaptureDonePopup() {
+    if (_captureDoneTimer) { clearInterval(_captureDoneTimer); _captureDoneTimer = null; }
+    document.getElementById('capture-done-backdrop').classList.remove('open');
+    document.getElementById('capture-done-popup').classList.remove('open');
+  }
+
+  async function triggerCaptureStart() {
+    try {
+      const res = await fetch('/api/check-usb');
+      const { available, path: usbPath } = await res.json();
+      showCaptureStartPopup(available, usbPath);
+    } catch {
+      showCaptureStartPopup(false, null);
+    }
+  }
+
 </script>
+
+  <!-- Capture start popup -->
+  <div class="capture-backdrop" id="capture-backdrop"></div>
+  <div class="capture-popup" id="capture-start-popup">
+    <div class="capture-popup-icon" id="csp-icon">💾</div>
+    <div class="capture-popup-title">Start Dataset Capture</div>
+    <div class="capture-popup-body" id="csp-body"></div>
+    <div class="capture-popup-path" id="csp-path"></div>
+    <div class="capture-popup-btns">
+      <button class="capture-popup-btn capture-popup-btn-start" id="csp-start-btn" onclick="confirmCaptureStart()">Start Capture</button>
+      <button class="capture-popup-btn capture-popup-btn-cancel" onclick="hideCaptureStartPopup()">Cancel</button>
+    </div>
+  </div>
+
+  <!-- Capture done popup -->
+  <div class="capture-backdrop" id="capture-done-backdrop" onclick="hideCaptureDonePopup()"></div>
+  <div class="capture-popup" id="capture-done-popup">
+    <div class="capture-popup-icon">✅</div>
+    <div class="capture-popup-title">Capture Complete</div>
+    <div class="capture-done-count" id="cdp-count">0 frames</div>
+    <div class="capture-popup-body">Dataset saved to:</div>
+    <div class="capture-popup-path" id="cdp-path"></div>
+    <div class="capture-popup-btns">
+      <button class="capture-popup-btn capture-popup-btn-close" onclick="hideCaptureDonePopup()">Close</button>
+    </div>
+    <div class="capture-done-dismiss" id="cdp-dismiss"></div>
+  </div>
+
 </body>
 </html>

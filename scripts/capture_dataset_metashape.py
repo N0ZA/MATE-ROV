@@ -12,6 +12,7 @@ DATASET_ROOT     = Path(__file__).resolve().parent.parent / "dataset"
 parser = argparse.ArgumentParser()
 parser.add_argument('--rtsp-url', default=DEFAULT_RTSP)
 parser.add_argument('--zoom', type=float, default=1.0)
+parser.add_argument('--output-dir', default=None)
 args = parser.parse_args()
 
 RTSP_URL = args.rtsp_url
@@ -38,7 +39,10 @@ def apply_zoom(frame, z):
     return cv2.resize(frame[y0:y0 + ch, x0:x0 + cw], (w, h), interpolation=cv2.INTER_LINEAR)
 
 
-output_dir = DATASET_ROOT / f"metashape_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+if args.output_dir:
+    output_dir = Path(args.output_dir)
+else:
+    output_dir = DATASET_ROOT / f"metashape_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
 output_dir.mkdir(parents=True, exist_ok=True)
 
 cap = cv2.VideoCapture(RTSP_URL)

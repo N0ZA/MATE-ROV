@@ -216,6 +216,7 @@
     // slot index → camera number (2–5)
     let slotToCam = [2, 3, 4, 5];
     let promoted  = false;
+    let currentCamZooms = [1, 1, 1, 1, 1]; // indexed by cam-1 (cam2→[0], cam3→[1], …)
 
     function renderSlots() {
       // Two-phase swap. Changing two imgs' srcs to each other's URLs at the
@@ -335,6 +336,7 @@
     function applyZoomState(data) {
       const sel   = data.selectedCam || 0;
       const zooms = data.camZooms || [1, 1, 1, 1, 1];
+      currentCamZooms = [...zooms];
       for (let s = 0; s < 4; s++) {
         const cam   = slotToCam[s];
         const box   = document.getElementById(`slot${s}`);
@@ -405,10 +407,28 @@
       const h = img.naturalHeight > 0 ? img.naturalHeight : img.clientHeight || 480;
       const canvas = document.createElement('canvas');
       canvas.width = w; canvas.height = h;
+      const camNum = slotToCam[selSlot];
+      const z = currentCamZooms[camNum - 1] || 1.0;
       try {
-        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        const ctx = canvas.getContext('2d');
+        if (z > 1.0) {
+          const cw = Math.floor(w / z), ch = Math.floor(h / z);
+          const x0 = Math.floor((w - cw) / 2), y0 = Math.floor((h - ch) / 2);
+          ctx.drawImage(img, x0, y0, cw, ch, 0, 0, w, h);
+        } else {
+          ctx.drawImage(img, 0, 0, w, h);
+        }
         _capturedFrame = canvas.toDataURL('image/png');
-        showBadge(`📸 CAM ${slotToCam[selSlot]} captured — press C to run crab detection`, 'rgba(0,200,100,0.92)', '#000');
+        showBadge(`📸 CAM ${camNum} captured — saving...`, 'rgba(0,200,100,0.92)', '#000');
+        fetch(`http://${host}:3000/api/save-snapshot`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ image: _capturedFrame, cam: camNum })
+        }).then(r => r.json()).then(d => {
+          if (d.ok) showBadge(`💾 Saved ${d.filename} — press C for crab detection`, 'rgba(0,200,100,0.92)', '#000');
+        }).catch(() => {
+          showBadge(`📸 CAM ${camNum} captured — press C for crab detection`, 'rgba(0,200,100,0.92)', '#000');
+        });
       } catch (err) {
         showBadge('⚠ Capture failed (CORS?) — check server logs', '#ef4444', '#fff');
         console.error('Canvas capture error:', err);
