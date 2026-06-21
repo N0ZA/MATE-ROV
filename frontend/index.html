@@ -1296,9 +1296,6 @@
   // Migrate: if gripper buttons were never explicitly assigned (old default was -1), apply new defaults
   ['btnArm1Gripper1100','btnArm1Gripper1900','btnArm2Gripper1100','btnArm2Gripper1900']
     .forEach(k => { if (_savedArm[k] === -1) delete _savedArm[k]; });
-  // Migrate: rotate buttons moved off Circle(1)/Square(2) to D-pad to avoid gripper conflict
-  if (_savedArm.btnArm1RotateCCW === 2)  delete _savedArm.btnArm1RotateCCW;
-  if (_savedArm.btnArm1RotateCW  === 1)  delete _savedArm.btnArm1RotateCW;
   let armBindings = { ...DEFAULT_ARM_BINDINGS, ..._savedArm };
   function saveArmBindings() { localStorage.setItem('gpArmBindings', JSON.stringify(armBindings)); }
 
@@ -1462,12 +1459,16 @@
     return fetch('/api/bindings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(bindings) });
   }
 
+  function saveArmBindingsToDisk() {
+    return fetch('/api/arm-bindings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(armBindings) });
+  }
+
   function saveInvertToDisk() {
     return fetch('/api/invert', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(axisInvert) });
   }
 
   function saveToDisk() {
-    Promise.all([saveBindingsToDisk(), saveInvertToDisk(), saveRangeToDisk()])
+    Promise.all([saveBindingsToDisk(), saveArmBindingsToDisk(), saveInvertToDisk(), saveRangeToDisk()])
       .then(() => {
         const btn = document.querySelector('.modal-save-btn');
         btn.textContent = 'SAVED ✓';
@@ -1477,6 +1478,7 @@
   }
 
   fetch('/api/bindings').then(r => r.json()).then(data => { bindings = { ...DEFAULT_BINDINGS, ...data }; scrubDofBindings(); _bindingsLoaded = true; }).catch(() => { _bindingsLoaded = true; });
+  fetch('/api/arm-bindings').then(r => r.json()).then(data => { if (Object.keys(data).length > 0) { armBindings = { ...DEFAULT_ARM_BINDINGS, ...data }; saveArmBindings(); } }).catch(() => {});
   fetch('/api/invert').then(r => r.json()).then(data => { axisInvert = { ...DEFAULT_INVERT, ...data }; saveInvert(); renderInvertButtons(); }).catch(() => {});
   fetch('/api/range').then(r => r.json()).then(data => {
     if (data.thrusterRange) thrusterRange = { ...DEFAULT_THRUSTER_RANGE, ...data.thrusterRange };

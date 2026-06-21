@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>eDNA Frequency Calculator</title>
+<style>
+  :root {
+    --bg3: #0d0822;
+    --bg2: #150e2e;
+    --bg1: #1e1240;
+    --p:   #3d2972;
+    --p1:  #5b3d8a;
+    --s:   #c4b5fd;
+    --s1:  #b0a0cc;
+    --gold: #facc15;
+    --green: #22c55e;
+    --red: #ef4444;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg3);
+    color: var(--s);
+    font-family: 'Segoe UI', sans-serif;
+    min-height: 100vh;
+    padding: 24px 16px;
+  }
+
+  header {
+    text-align: center;
+    margin-bottom: 24px;
+  }
+
+  header h1 {
+    font-size: 20px;
+    font-weight: 700;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--s);
+  }
+
+  header p {
+    font-size: 11px;
+    color: var(--s1);
+    margin-top: 4px;
+    letter-spacing: 0.05em;
+  }
+
+  .card {
+    background: var(--bg2);
+    border: 1px solid var(--p1);
+    border-radius: 8px;
+    padding: 16px;
+    max-width: 900px;
+    margin: 0 auto;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  thead th {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--s1);
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--p1);
+    text-align: left;
+  }
+
+  thead th:nth-child(2),
+  thead th:nth-child(3) {
+    text-align: center;
+    width: 140px;
+  }
+
+  tbody tr {
+    border-bottom: 1px solid var(--p);
+    transition: background 0.1s;
+  }
+
+  tbody tr:hover {
+    background: var(--bg1);
+  }
+
+  tbody td {
+    padding: 6px 10px;
+    vertical-align: middle;
+  }
+
+  input[type="text"], input[type="number"] {
+    background: var(--bg1);
+    border: 1px solid var(--p1);
+    border-radius: 4px;
+    color: var(--s);
+    font-family: 'Segoe UI', sans-serif;
+    font-size: 12px;
+    padding: 5px 8px;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+
+  input[type="text"]:focus, input[type="number"]:focus {
+    border-color: var(--s);
+  }
+
+  input[type="text"] {
+    width: 100%;
+  }
+
+  input[type="number"] {
+    width: 100%;
+    text-align: center;
+    font-family: Consolas, monospace;
+    -moz-appearance: textfield;
+  }
+
+  input[type="number"]::-webkit-outer-spin-button,
+  input[type="number"]::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+  }
+
+  td:nth-child(2), td:nth-child(3) {
+    width: 140px;
+    text-align: center;
+  }
+
+  .pct-cell {
+    font-family: Consolas, monospace;
+    font-size: 12px;
+    color: var(--gold);
+    letter-spacing: 0.03em;
+  }
+
+  .pct-cell.empty {
+    color: var(--s1);
+  }
+
+  .remove-btn {
+    background: none;
+    border: none;
+    color: var(--s1);
+    cursor: pointer;
+    font-size: 14px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    transition: color 0.15s, background 0.15s;
+    line-height: 1;
+  }
+
+  .remove-btn:hover {
+    color: var(--red);
+    background: rgba(239, 68, 68, 0.1);
+  }
+
+  td.remove-col {
+    width: 36px;
+    text-align: center;
+    padding: 4px;
+  }
+
+  tfoot td {
+    padding: 10px 10px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--s);
+    border-top: 1px solid var(--p1);
+  }
+
+  tfoot .total-label {
+    text-align: right;
+    padding-right: 16px;
+  }
+
+  tfoot .total-count {
+    font-family: Consolas, monospace;
+    font-size: 14px;
+    color: var(--green);
+    text-align: center;
+  }
+
+  .actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 16px;
+    justify-content: flex-end;
+  }
+
+  button {
+    font-family: 'Segoe UI', sans-serif;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 7px 16px;
+    border-radius: 5px;
+    cursor: pointer;
+    border: 1px solid transparent;
+    transition: background 0.15s, border-color 0.15s;
+  }
+
+  .btn-add {
+    background: var(--bg1);
+    border-color: var(--p1);
+    color: var(--s);
+  }
+
+  .btn-add:hover {
+    background: var(--p);
+    border-color: var(--s);
+  }
+
+  .btn-reset {
+    background: var(--bg1);
+    border-color: var(--p1);
+    color: var(--s1);
+  }
+
+  .btn-reset:hover {
+    background: rgba(239, 68, 68, 0.15);
+    border-color: var(--red);
+    color: var(--red);
+  }
+
+  .formula-note {
+    text-align: center;
+    font-size: 10px;
+    color: var(--s1);
+    margin-top: 14px;
+    letter-spacing: 0.04em;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>eDNA Frequency Calculator</h1>
+  <p>Enter species names and counts — percentage frequency updates automatically</p>
+</header>
+
+<div class="card">
+  <table id="species-table">
+    <thead>
+      <tr>
+        <th>Species</th>
+        <th>Number Seen</th>
+        <th>% Frequency</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody id="species-body">
+    </tbody>
+    <tfoot>
+      <tr>
+        <td class="total-label" colspan="1">Total</td>
+        <td class="total-count" id="total-count">0</td>
+        <td colspan="2"></td>
+      </tr>
+    </tfoot>
+  </table>
+
+  <div class="actions">
+    <button class="btn-reset" onclick="resetDefaults()">Reset to Defaults</button>
+    <button class="btn-add" onclick="addRow('', '')">+ Add Row</button>
+  </div>
+
+  <p class="formula-note">% Frequency = (Number Seen / Total) × 100</p>
+</div>
+
+<script>
+  const DEFAULT_SPECIES = [
+    'Snow crab (Chionecetes opilio)',
+    'Acadian hermit crab (Pagarus acadianus)',
+    'Western Atlantic Hairy Hermit Crab (Pagarus arcuatus)',
+    'European Green Crab (Carcinus maenas)',
+    'Rock Crab (Cancer pagurus)',
+    'Jonah Crab (Cancer borealis)',
+    'Spiny Sunstar (Crossaster papposus)',
+    'Sea Urchin (Strongylocentrotus droebachiensis)',
+    'Boreal Sea Star (Boreal asterias)',
+    'Daisy brittle star (Ophiopholis aculeata)',
+  ];
+
+  function recalculate() {
+    const rows = document.querySelectorAll('#species-body tr');
+    let total = 0;
+    rows.forEach(row => {
+      total += parseInt(row.querySelector('.count-input').value) || 0;
+    });
+    document.getElementById('total-count').textContent = total;
+    rows.forEach(row => {
+      const count = parseInt(row.querySelector('.count-input').value) || 0;
+      const cell = row.querySelector('.pct-cell');
+      if (total > 0) {
+        cell.textContent = ((count / total) * 100).toFixed(8) + '%';
+        cell.classList.remove('empty');
+      } else {
+        cell.textContent = '—';
+        cell.classList.add('empty');
+      }
+    });
+  }
+
+  function addRow(name, count) {
+    const tbody = document.getElementById('species-body');
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td><input type="text" class="name-input" value="${escHtml(name)}" placeholder="Species name" oninput="recalculate()"></td>
+      <td><input type="number" class="count-input" value="${escHtml(count)}" min="0" placeholder="0" oninput="recalculate()"></td>
+      <td><span class="pct-cell empty">—</span></td>
+      <td class="remove-col"><button class="remove-btn" onclick="removeRow(this)" title="Remove row">✕</button></td>
+    `;
+    tbody.appendChild(tr);
+    recalculate();
+    return tr;
+  }
+
+  function removeRow(btn) {
+    btn.closest('tr').remove();
+    recalculate();
+  }
+
+  function resetDefaults() {
+    document.getElementById('species-body').innerHTML = '';
+    DEFAULT_SPECIES.forEach(name => addRow(name, ''));
+  }
+
+  function escHtml(str) {
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/"/g, '&quot;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+  }
+
+  resetDefaults();
+</script>
+</body>
+</html>

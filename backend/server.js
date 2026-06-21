@@ -116,6 +116,23 @@ function saveBindingsToFile(data) {
 
 let savedBindings = loadBindings();
 
+/* ================= ARM BINDINGS PERSISTENCE ================= */
+const ARM_BINDINGS_FILE = join(__dirname, 'arm-bindings.json');
+
+function loadArmBindings() {
+  try {
+    return JSON.parse(fs.readFileSync(ARM_BINDINGS_FILE, 'utf8'));
+  } catch {
+    return {};
+  }
+}
+
+function saveArmBindingsToFile(data) {
+  fs.writeFileSync(ARM_BINDINGS_FILE, JSON.stringify(data, null, 2));
+}
+
+let savedArmBindings = loadArmBindings();
+
 /* ================= AXIS INVERT PERSISTENCE ================= */
 const INVERT_FILE = join(__dirname, 'invert.json');
 const DEFAULT_INVERT = {
@@ -152,6 +169,17 @@ app.post('/api/bindings', (req, res) => {
   savedBindings = { ...DEFAULT_BINDINGS, ...req.body };
   saveBindingsToFile(savedBindings);
   console.log('💾 Bindings saved:', JSON.stringify(savedBindings));
+  res.json({ ok: true });
+});
+
+app.get('/api/arm-bindings', (req, res) => {
+  res.json(savedArmBindings);
+});
+
+app.post('/api/arm-bindings', (req, res) => {
+  savedArmBindings = req.body;
+  saveArmBindingsToFile(savedArmBindings);
+  console.log('💾 Arm bindings saved');
   res.json({ ok: true });
 });
 
