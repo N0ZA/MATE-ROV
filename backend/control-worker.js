@@ -35,7 +35,7 @@ function clamp(v, min, max) { return Math.max(min, Math.min(max, v)); }
 //   sign      = flip if rotating makes the jaws creep the wrong way
 //   0.0       = disable coupling for that arm (treat motors as independent)
 // =====================================================
-const ARM1_WRIST_COUPLE = 1.0;
+const ARM1_WRIST_COUPLE = -1.0;
 const ARM2_WRIST_COUPLE = -1.0;
 
 function mixWrist(rotatePwm, gripperPwm, couple) {
@@ -115,10 +115,10 @@ function mixAndSend() {
     armData.arm2_shoulder,
     w2.rotate,              // MD7: rotate motor (rotate intent)
     w2.gripper,             // MD8: gripper motor (grip intent + rotate compensation)
-    relayData[0],           // R1 — light 1
-    relayData[1],           // R2 — light 2
-    relayData[2],           // R3 — light 3
-    relayData[3],           // R4 — light 4
+    relayData[0],                         // R1 — light 1
+    relayData[1],                         // R2 — light 2
+    armData.arm1_rotate > 1510 ? 1 : 0,  // R3 — arm1 rotate CW
+    armData.arm1_rotate < 1490 ? 1 : 0,  // R4 — arm1 rotate CCW
   ];
   
   sock.send(

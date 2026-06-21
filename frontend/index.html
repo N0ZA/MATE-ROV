@@ -182,25 +182,6 @@
     .theme-picker-row { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--bg2); }
     .theme-picker-row input[type="color"] { width: 44px; height: 32px; border: 1px solid var(--p1); border-radius: 4px; background: none; cursor: pointer; padding: 2px; }
 
-    /* ====== CAPTURE POPUPS ====== */
-    .capture-backdrop { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 490; }
-    .capture-backdrop.open { display: block; }
-    .capture-popup { display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 491; background: var(--bg1); border: 2px solid var(--s); border-radius: 12px; padding: 28px 28px 22px; min-width: 380px; max-width: 500px; text-align: center; box-shadow: 0 0 50px rgba(196,181,253,0.25); }
-    .capture-popup.open { display: block; }
-    .capture-popup-icon { font-size: 28px; margin-bottom: 8px; }
-    .capture-popup-title { font-size: 13px; font-weight: bold; color: var(--s); text-transform: uppercase; letter-spacing: 2px; margin-bottom: 14px; }
-    .capture-popup-body { font-size: 13px; color: var(--s1); line-height: 1.65; margin-bottom: 8px; }
-    .capture-popup-path { font-family: Consolas, monospace; font-size: 11px; color: #facc15; word-break: break-all; margin: 8px 0 20px; padding: 8px 10px; background: var(--bg3); border-radius: 6px; border: 1px solid var(--p); text-align: left; }
-    .capture-popup-btns { display: flex; gap: 10px; justify-content: center; }
-    .capture-popup-btn { padding: 8px 22px; border-radius: 6px; border: 1px solid; cursor: pointer; font-size: 13px; font-weight: bold; letter-spacing: 0.5px; text-transform: uppercase; }
-    .capture-popup-btn-start { background: #16a34a; border-color: #22c55e; color: #fff; box-shadow: 0 0 10px rgba(34,197,94,0.3); }
-    .capture-popup-btn-start:hover { background: #15803d; }
-    .capture-popup-btn-cancel { background: var(--bg2); border-color: var(--p1); color: var(--s1); }
-    .capture-popup-btn-cancel:hover { border-color: #ef4444; color: #ef4444; }
-    .capture-popup-btn-close { background: var(--p); border-color: var(--s); color: var(--s); }
-    .capture-popup-btn-close:hover { background: var(--p1); }
-    .capture-done-count { font-size: 32px; font-weight: bold; color: #22c55e; font-family: Consolas, monospace; margin: 8px 0; }
-    .capture-done-dismiss { font-size: 11px; color: var(--p1); margin-top: 12px; }
   </style>
 </head>
 <body>
@@ -570,11 +551,11 @@
           <p class="modal-hint">Click REMAP, then move the axis or press a button on your controller — or press any keyboard key to bind it instead.</p>
           <div id="bindingsList"></div>
 
-          <div class="invert-section-title" style="margin-top:18px;">Dataset Capture</div>
+          <div class="invert-section-title" style="margin-top:18px;">Keel Depth</div>
           <div class="invert-row">
-            <div class="invert-label">Capture Key</div>
-            <div class="invert-desc">Toggle Metashape dataset capture on/off</div>
-            <button id="captureKeyBtn" class="remap-btn" onclick="recordCaptureKey()">F9</button>
+            <div class="invert-label">Keel Depth Key</div>
+            <div class="invert-desc">Take a keel depth measurement photo</div>
+            <button id="keelKeyBtn" class="remap-btn" onclick="recordKeelKey()">k</button>
           </div>
         </div>
 
@@ -919,17 +900,12 @@
   let yawOrigin = 0, pitchDisplayOffset = 0, rollDisplayOffset = 0;
   let latestPitchDeg = 0;
   let teensyTimeout = null;
-  let camZooms = [1.0, 1.0, 1.0, 1.0, 1.0];
-  let selectedCam = 0;
-  let camOrder = [2, 3, 4, 5];
-  let captureKey = 'a';
+  let slotZooms = [1.0, 1.0, 1.0, 1.0];
+  let selectedSlot = -1;
+  let keelKey = 'k';
 
   socket.on('disconnect', () => {
     clearTimeout(teensyTimeout);
-  });
-
-  socket.on('cam-order', (order) => {
-    camOrder = order;
   });
 
   socket.on('cam-restart', ({ cam }) => {
@@ -1006,6 +982,7 @@
   let rollHoldKpUpWas=false, rollHoldKpDownWas=false;
   let arm1Rot1100Was=false, arm1Rot1900Was=false,
       arm2Rot1100Was=false, arm2Rot1900Was=false;
+  let arm1RotBtnHeld=false, arm2RotBtnHeld=false;
   let armBtnWas=false, disarmBtnWas=false;
   let optionsBtnWas=false, camZoomInWas=false, camZoomOutWas=false, promoteCamWas=false;
   let light1Was=false, light2Was=false, light3Was=false, light4Was=false;
@@ -1280,9 +1257,13 @@
   function scrubDofBindings() { DOF_BIND_KEYS.forEach(k => delete bindings[k]); saveBindings(); }
 
   let bindings = JSON.parse(localStorage.getItem('gpBindings') || 'null') || {...DEFAULT_BINDINGS};
+  let _bindingsLoaded = false;
   scrubDofBindings(); // purge any stale DOF keys from localStorage
 
-  function saveBindings() { localStorage.setItem('gpBindings', JSON.stringify(bindings)); }
+  function saveBindings() {
+    localStorage.setItem('gpBindings', JSON.stringify(bindings));
+    if (_bindingsLoaded) saveBindingsToDisk();
+  }
 
   /* ============ ARM BINDINGS (DualSense) ============ */
   const DEFAULT_ARM_BINDINGS = {
@@ -1322,7 +1303,7 @@
   function saveArmBindings() { localStorage.setItem('gpArmBindings', JSON.stringify(armBindings)); }
 
   function emitCamZoomState() {
-    socket.emit('cam-zoom-state', { selectedCam, camZooms: [...camZooms] });
+    socket.emit('cam-zoom-state', { selectedSlot, slotZooms: [...slotZooms] });
   }
 
   const ARM_BINDING_META = [
@@ -1495,7 +1476,7 @@
       .catch(() => alert('Save failed — check server connection'));
   }
 
-  fetch('/api/bindings').then(r => r.json()).then(data => { bindings = { ...DEFAULT_BINDINGS, ...data }; scrubDofBindings(); }).catch(() => {});
+  fetch('/api/bindings').then(r => r.json()).then(data => { bindings = { ...DEFAULT_BINDINGS, ...data }; scrubDofBindings(); _bindingsLoaded = true; }).catch(() => { _bindingsLoaded = true; });
   fetch('/api/invert').then(r => r.json()).then(data => { axisInvert = { ...DEFAULT_INVERT, ...data }; saveInvert(); renderInvertButtons(); }).catch(() => {});
   fetch('/api/range').then(r => r.json()).then(data => {
     if (data.thrusterRange) thrusterRange = { ...DEFAULT_THRUSTER_RANGE, ...data.thrusterRange };
@@ -1606,7 +1587,7 @@
     renderInvertButtons();
     renderBindings();
     renderRangeInputs();
-    loadCaptureKey();
+    loadKeelKey();
     const dsi = document.getElementById('depthHoldStepInput');
     if (dsi) dsi.value = depthHoldStep;
     const ysi = document.getElementById('yawHoldStepInput');
@@ -1622,42 +1603,43 @@
     document.getElementById('settingsModal').classList.add('open');
   }
 
-  async function loadCaptureKey() {
+  async function loadKeelKey() {
     try {
-      const res = await fetch('/api/capture-key');
+      const res = await fetch('/api/keel-key');
       const data = await res.json();
-      captureKey = data.key || 'a';
-      const btn = document.getElementById('captureKeyBtn');
-      if (btn) btn.textContent = data.key || 'F9';
+      keelKey = data.key || 'k';
+      const btn = document.getElementById('keelKeyBtn');
+      if (btn) btn.textContent = keelKey;
     } catch {}
   }
-  loadCaptureKey();
+  loadKeelKey();
 
-  let _captureKeyHandler = null;
+  let _keelKeyHandler = null;
 
-  function recordCaptureKey() {
-    const btn = document.getElementById('captureKeyBtn');
+  function recordKeelKey() {
+    const btn = document.getElementById('keelKeyBtn');
     if (!btn) return;
-    if (_captureKeyHandler) {
-      document.removeEventListener('keydown', _captureKeyHandler);
-      _captureKeyHandler = null;
+    if (_keelKeyHandler) {
+      document.removeEventListener('keydown', _keelKeyHandler);
+      _keelKeyHandler = null;
     }
     btn.textContent = '...';
     btn.style.color = '#facc15';
-    _captureKeyHandler = (e) => {
+    _keelKeyHandler = (e) => {
       e.preventDefault();
       const keyName = e.key === ' ' ? 'Space' : e.key;
+      keelKey = keyName;
       btn.textContent = keyName;
       btn.style.color = '';
-      fetch('/api/capture-key', {
+      fetch('/api/keel-key', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ key: keyName })
       });
-      document.removeEventListener('keydown', _captureKeyHandler);
-      _captureKeyHandler = null;
+      document.removeEventListener('keydown', _keelKeyHandler);
+      _keelKeyHandler = null;
     };
-    document.addEventListener('keydown', _captureKeyHandler);
+    document.addEventListener('keydown', _keelKeyHandler);
   }
 
   function closeSettings() {
@@ -1972,9 +1954,9 @@
     const tag = e.target.tagName;
     if (tag === 'INPUT' || tag === 'TEXTAREA') return;
     const key = e.key === ' ' ? 'Space' : e.key;
-    if (key === 'b' || key === 'B') { e.preventDefault(); socket.emit('remote-capture-frame'); return; }
-    if (key === 'c' || key === 'C') { e.preventDefault(); socket.emit('remote-run-inference'); return; }
-    if (key === captureKey) { e.preventDefault(); if (isCaptureActive) socket.emit('toggle-capture'); else triggerCaptureStart(); }
+    if (key === 'b' || key === 'B') { e.preventDefault(); socket.emit('key-forward', { key: 'b' }); return; }
+    if (key === 'c' || key === 'C') { e.preventDefault(); socket.emit('key-forward', { key: 'c' }); return; }
+    if (key === keelKey || key === keelKey.toUpperCase()) { e.preventDefault(); socket.emit('key-forward', { key: keelKey }); return; }
   });
 
   /* ============ GAMEPAD ============ */
@@ -2310,7 +2292,7 @@
         const rotCW    = readBtnBinding(armBindings.btnArm1RotateCW,  armGp, gp, armGp);
         const arm1RotPwm = rotCCW ? Math.round(1500 - r1Speed * 500)
                           : rotCW  ? Math.round(1500 + r1Speed * 500) : 1500;
-        setArmSlider('arm1_rotate', clamp(arm1RotPwm, armRange['arm1_rotate'].min, armRange['arm1_rotate'].max));
+        if (!arm1RotBtnHeld) setArmSlider('arm1_rotate', clamp(arm1RotPwm, armRange['arm1_rotate'].min, armRange['arm1_rotate'].max));
 
         // Left arm rotate: hold direction button to spin, release to stop.
         // Squeeze L2 for proportional speed; release L2 alone defaults to full speed.
@@ -2320,34 +2302,37 @@
         const l2RotCW  = readBtnBinding(armBindings.btnArm2RotateCW,  armGp, gp, armGp);
         const arm2RotPwm = l2RotCCW ? Math.round(1500 - l2Speed * 500)
                          : l2RotCW  ? Math.round(1500 + l2Speed * 500) : 1500;
-        setArmSlider('arm2_rotate', clamp(arm2RotPwm, armRange['arm2_rotate'].min, armRange['arm2_rotate'].max));
-
-        // Camera zoom control
-        const bCamSel     = readBtnBinding(armBindings.btnCamSelect,  armGp, gp, armGp);
-        const bCamZoomIn  = readBtnBinding(armBindings.btnCamZoomIn,  armGp, gp, armGp);
-        const bCamZoomOut = readBtnBinding(armBindings.btnCamZoomOut, armGp, gp, armGp);
-        if (bCamSel && !optionsBtnWas) {
-          selectedCam = camOrder[(camOrder.indexOf(selectedCam) + 1) % camOrder.length];
-          emitCamZoomState();
-        }
-        if (bCamZoomIn && !camZoomInWas && selectedCam > 0) {
-          camZooms[selectedCam - 1] = Math.min(5.0, Math.round((camZooms[selectedCam - 1] + camZoomStep) * 1000) / 1000);
-          emitCamZoomState();
-        }
-        if (bCamZoomOut && !camZoomOutWas && selectedCam > 0) {
-          camZooms[selectedCam - 1] = Math.max(1.0, Math.round((camZooms[selectedCam - 1] - camZoomStep) * 1000) / 1000);
-          emitCamZoomState();
-        }
-        const bPromoteCam = readBtnBinding(armBindings.btnPromoteCam, armGp, gp, armGp);
-        if (bPromoteCam && !promoteCamWas && selectedCam > 0) {
-          socket.emit('promote-cam', { cam: selectedCam });
-        }
-        optionsBtnWas = bCamSel;
-        camZoomInWas  = bCamZoomIn;
-        camZoomOutWas = bCamZoomOut;
-        promoteCamWas = bPromoteCam;
+        if (!arm2RotBtnHeld) setArmSlider('arm2_rotate', clamp(arm2RotPwm, armRange['arm2_rotate'].min, armRange['arm2_rotate'].max));
 
         emitArmControls();
+    }
+
+    // Camera select/zoom/promote — runs regardless of whether arm controller is connected
+    // so keyboard-bound keys always work.
+    if (remapTarget === null) {
+      const bCamSel     = readBtnBinding(armBindings.btnCamSelect,  armGp, gp, armGp);
+      const bCamZoomIn  = readBtnBinding(armBindings.btnCamZoomIn,  armGp, gp, armGp);
+      const bCamZoomOut = readBtnBinding(armBindings.btnCamZoomOut, armGp, gp, armGp);
+      const bPromoteCam = readBtnBinding(armBindings.btnPromoteCam, armGp, gp, armGp);
+      if (bCamSel && !optionsBtnWas) {
+        selectedSlot = (selectedSlot + 1) % 4;
+        emitCamZoomState();
+      }
+      if (bCamZoomIn && !camZoomInWas && selectedSlot >= 0) {
+        slotZooms[selectedSlot] = Math.min(5.0, Math.round((slotZooms[selectedSlot] + camZoomStep) * 1000) / 1000);
+        emitCamZoomState();
+      }
+      if (bCamZoomOut && !camZoomOutWas && selectedSlot >= 0) {
+        slotZooms[selectedSlot] = Math.max(1.0, Math.round((slotZooms[selectedSlot] - camZoomStep) * 1000) / 1000);
+        emitCamZoomState();
+      }
+      if (bPromoteCam && !promoteCamWas && selectedSlot >= 0) {
+        socket.emit('promote-cam', { slot: selectedSlot });
+      }
+      optionsBtnWas = bCamSel;
+      camZoomInWas  = bCamZoomIn;
+      camZoomOutWas = bCamZoomOut;
+      promoteCamWas = bPromoteCam;
     }
 
     requestAnimationFrame(pollGamepad);
@@ -2521,8 +2506,9 @@
   rotatePwmButtons.forEach(({ id, sliderId, pwm }) => {
     const btn    = document.getElementById(id);
     const slider = document.getElementById(sliderId);
-    const reset  = () => { slider.value = 1500; updateArmValue(sliderId); emitArmControls(); };
-    btn.addEventListener('mousedown',  () => { slider.value = clamp(pwm, armRange[sliderId].min, armRange[sliderId].max); updateArmValue(sliderId); emitArmControls(); });
+    const setHeld = (v) => { if (sliderId === 'arm1_rotate') arm1RotBtnHeld = v; else arm2RotBtnHeld = v; };
+    const reset  = () => { setHeld(false); slider.value = 1500; updateArmValue(sliderId); emitArmControls(); };
+    btn.addEventListener('mousedown',  () => { setHeld(true); slider.value = clamp(pwm, armRange[sliderId].min, armRange[sliderId].max); updateArmValue(sliderId); emitArmControls(); });
     btn.addEventListener('mouseup',    reset);
     btn.addEventListener('mouseleave', reset);
   });
@@ -2532,116 +2518,7 @@
   updateThrusters();
   emitArmControls();
 
-  /* ============ DATASET CAPTURE POPUPS ============ */
-  let isCaptureActive = false;
-  let _captureDoneTimer = null;
-
-  socket.on('capture-status', ({ active }) => { isCaptureActive = active; });
-
-  socket.on('capture-done', ({ count, outputDir }) => {
-    showCaptureDonePopup(count, outputDir);
-  });
-
-  function showCaptureStartPopup(usbAvailable, usbPath) {
-    const backdrop = document.getElementById('capture-backdrop');
-    const popup    = document.getElementById('capture-start-popup');
-    const icon     = document.getElementById('csp-icon');
-    const body     = document.getElementById('csp-body');
-    const path     = document.getElementById('csp-path');
-    const startBtn = document.getElementById('csp-start-btn');
-
-    if (usbAvailable && usbPath) {
-      icon.textContent = '💾';
-      body.textContent = 'USB drive detected. Dataset will be saved to the USB drive.';
-      path.textContent = usbPath + '/dataset/metashape_<timestamp>';
-      startBtn.dataset.useUsb = 'true';
-    } else {
-      icon.textContent = '💿';
-      body.textContent = 'No USB drive connected. Dataset will be saved locally.';
-      path.textContent = '/home/orin/MATE-ROV/dataset/metashape_<timestamp>';
-      startBtn.dataset.useUsb = 'false';
-    }
-
-    backdrop.classList.add('open');
-    popup.classList.add('open');
-  }
-
-  function hideCaptureStartPopup() {
-    document.getElementById('capture-backdrop').classList.remove('open');
-    document.getElementById('capture-start-popup').classList.remove('open');
-  }
-
-  function confirmCaptureStart() {
-    const startBtn = document.getElementById('csp-start-btn');
-    const useUsb   = startBtn.dataset.useUsb === 'true';
-    hideCaptureStartPopup();
-    socket.emit('start-capture', { useUsb });
-  }
-
-  function showCaptureDonePopup(count, outputDir) {
-    const backdrop = document.getElementById('capture-done-backdrop');
-    const popup    = document.getElementById('capture-done-popup');
-    document.getElementById('cdp-count').textContent   = count + ' frames';
-    document.getElementById('cdp-path').textContent    = outputDir || 'dataset folder';
-    document.getElementById('cdp-dismiss').textContent = 'Closes in 6s';
-
-    backdrop.classList.add('open');
-    popup.classList.add('open');
-
-    if (_captureDoneTimer) clearInterval(_captureDoneTimer);
-    let remaining = 6;
-    _captureDoneTimer = setInterval(() => {
-      remaining--;
-      const el = document.getElementById('cdp-dismiss');
-      if (el) el.textContent = remaining > 0 ? `Closes in ${remaining}s` : '';
-      if (remaining <= 0) { clearInterval(_captureDoneTimer); _captureDoneTimer = null; hideCaptureDonePopup(); }
-    }, 1000);
-  }
-
-  function hideCaptureDonePopup() {
-    if (_captureDoneTimer) { clearInterval(_captureDoneTimer); _captureDoneTimer = null; }
-    document.getElementById('capture-done-backdrop').classList.remove('open');
-    document.getElementById('capture-done-popup').classList.remove('open');
-  }
-
-  async function triggerCaptureStart() {
-    try {
-      const res = await fetch('/api/check-usb');
-      const { available, path: usbPath } = await res.json();
-      showCaptureStartPopup(available, usbPath);
-    } catch {
-      showCaptureStartPopup(false, null);
-    }
-  }
-
 </script>
-
-  <!-- Capture start popup -->
-  <div class="capture-backdrop" id="capture-backdrop"></div>
-  <div class="capture-popup" id="capture-start-popup">
-    <div class="capture-popup-icon" id="csp-icon">💾</div>
-    <div class="capture-popup-title">Start Dataset Capture</div>
-    <div class="capture-popup-body" id="csp-body"></div>
-    <div class="capture-popup-path" id="csp-path"></div>
-    <div class="capture-popup-btns">
-      <button class="capture-popup-btn capture-popup-btn-start" id="csp-start-btn" onclick="confirmCaptureStart()">Start Capture</button>
-      <button class="capture-popup-btn capture-popup-btn-cancel" onclick="hideCaptureStartPopup()">Cancel</button>
-    </div>
-  </div>
-
-  <!-- Capture done popup -->
-  <div class="capture-backdrop" id="capture-done-backdrop" onclick="hideCaptureDonePopup()"></div>
-  <div class="capture-popup" id="capture-done-popup">
-    <div class="capture-popup-icon">✅</div>
-    <div class="capture-popup-title">Capture Complete</div>
-    <div class="capture-done-count" id="cdp-count">0 frames</div>
-    <div class="capture-popup-body">Dataset saved to:</div>
-    <div class="capture-popup-path" id="cdp-path"></div>
-    <div class="capture-popup-btns">
-      <button class="capture-popup-btn capture-popup-btn-close" onclick="hideCaptureDonePopup()">Close</button>
-    </div>
-    <div class="capture-done-dismiss" id="cdp-dismiss"></div>
-  </div>
 
 </body>
 </html>

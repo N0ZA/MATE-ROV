@@ -104,8 +104,8 @@
     .box.dragging  { opacity: 0.35; cursor: grabbing; }
     .box.drag-over { border-color: #c4b5fd !important; box-shadow: inset 0 0 0 3px #c4b5fd, 0 0 18px rgba(196,181,253,0.5); }
 
-    /* ── capture badge ── */
-    #capture-badge {
+    /* ── status badge ── */
+    #status-badge {
       position: fixed;
       top: 60px;
       left: 50%;
@@ -148,7 +148,7 @@
   </style>
 </head>
 <body>
-  <div id="capture-badge"></div>
+  <div id="status-badge"></div>
 
   <div id="infer-overlay" onclick="closeInfer()">
     <div id="infer-status">🔍 Running crab detection...</div>
@@ -156,15 +156,6 @@
     <img id="infer-img" src="" alt="Inference result" style="display:none;" onclick="event.stopPropagation()">
     <div id="infer-hint" style="display:none;">Press any key or click anywhere to close</div>
   </div>
-
-  <button id="capture-btn" onclick="toggleCapture()"
-       style="position:fixed; top:12px; left:50%; transform:translateX(-50%);
-              background:#1e1040; color:#c4b5fd; border:2px solid #3d2972;
-              padding:6px 18px; border-radius:8px; font-size:14px;
-              font-family:Consolas,monospace; z-index:9999; cursor:pointer;
-              letter-spacing:0.5px; white-space:nowrap;">
-    📸 Dataset Capture &nbsp;<span id="capture-key-label">[?]</span>
-  </button>
 
   <div class="grid" id="cam-grid">
     <div class="box" id="slot0" draggable="true" data-slot="0">
@@ -216,7 +207,7 @@
     // slot index → camera number (2–5)
     let slotToCam = [2, 3, 4, 5];
     let promoted  = false;
-    let currentCamZooms = [1, 1, 1, 1, 1]; // indexed by cam-1 (cam2→[0], cam3→[1], …)
+    let currentSlotZooms = [1, 1, 1, 1]; // indexed by slot (0–3)
 
     function renderSlots() {
       // Two-phase swap. Changing two imgs' srcs to each other's URLs at the
@@ -334,17 +325,16 @@
     })();
 
     function applyZoomState(data) {
-      const sel   = data.selectedCam || 0;
-      const zooms = data.camZooms || [1, 1, 1, 1, 1];
-      currentCamZooms = [...zooms];
+      const selSlot = data.selectedSlot ?? -1;
+      const zooms   = data.slotZooms || [1, 1, 1, 1];
+      currentSlotZooms = [...zooms];
       for (let s = 0; s < 4; s++) {
-        const cam   = slotToCam[s];
         const box   = document.getElementById(`slot${s}`);
         const img   = document.getElementById(`img${s}`);
         const badge = document.getElementById(`zoom${s}`);
-        const z     = zooms[cam - 1] || 1.0;
+        const z     = zooms[s] || 1.0;
         if (img)   img.style.transform = z !== 1.0 ? `scale(${z})` : '';
-        if (sel === cam) {
+        if (s === selSlot) {
           box.classList.add('cam-selected');
           if (badge) { badge.textContent = `${Math.round(z * 100)}%`; badge.style.display = ''; }
         } else {
@@ -354,39 +344,60 @@
       }
     }
 
-    /* ── Dataset Capture ── */
-    let captureKey = 'a';
+    /* ── Keel Depth ── */
+    let keelKey = 'k';
 
-    function updateCaptureBtn(active, count) {
-      const btn = document.getElementById('capture-btn');
-      if (!btn) return;
-      if (active) {
-        btn.style.background = '#dc2626';
-        btn.style.color = '#fff';
-        btn.style.borderColor = '#dc2626';
-        btn.innerHTML = `● REC &nbsp;<span id="capture-key-label">${count} images</span>`;
-      } else {
-        btn.style.background = '#1e1040';
-        btn.style.color = '#c4b5fd';
-        btn.style.borderColor = '#3d2972';
-        btn.innerHTML = `📸 Dataset Capture &nbsp;<span id="capture-key-label">[${captureKey}]</span>`;
+    fetch(`http://${host}:3000/api/keel-key`)
+      .then(r => r.json())
+      .then(d => { keelKey = d.key || 'k'; })
+      .catch(() => {});
+
+    function captureAndKeel() {
+      let selSlot = -1;
+      for (let s = 0; s < 4; s++) {
+        if (document.getElementById(`slot${s}`)?.classList.contains('cam-selected')) { selSlot = s; break; }
+      }
+      if (selSlot === -1) { showBadge('⚠ No camera selected — use controller to select one', '#f59e0b', '#000'); return; }
+      const img = document.getElementById(`img${selSlot}`);
+      if (!img || img.style.display === 'none') { showBadge('⚠ No signal on selected camera', '#ef4444', '#fff'); return; }
+      const w = img.naturalWidth  > 0 ? img.naturalWidth  : img.clientWidth  || 640;
+      const h = img.naturalHeight > 0 ? img.naturalHeight : img.clientHeight || 480;
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      const z = currentSlotZooms[selSlot] || 1.0;
+      try {
+        const ctx = canvas.getContext('2d');
+        if (z > 1.0) {
+          const cw = Math.floor(w / z), ch = Math.floor(h / z);
+          const x0 = Math.floor((w - cw) / 2), y0 = Math.floor((h - ch) / 2);
+          ctx.drawImage(img, x0, y0, cw, ch, 0, 0, w, h);
+        } else {
+          ctx.drawImage(img, 0, 0, w, h);
+        }
+        const imageData = canvas.toDataURL('image/png');
+        showBadge('📐 Opening keel depth tool...', '#3d2972', '#c4b5fd');
+        fetch(`http://${host}:3000/api/keel-depth`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ image: imageData })
+        })
+        .then(r => r.json())
+        .then(d => {
+          if (d.error) showBadge('⚠ ' + d.error, '#ef4444', '#fff');
+          else showBadge('📐 Keel tool opened — use mouse to measure', 'rgba(0,200,100,0.92)', '#000');
+        })
+        .catch(err => showBadge('⚠ Error: ' + err.message, '#ef4444', '#fff'));
+      } catch (err) {
+        showBadge('⚠ Capture failed — check server logs', '#ef4444', '#fff');
+        console.error('Keel capture error:', err);
       }
     }
-
-    function toggleCapture() {
-      if (window._camSocket) window._camSocket.emit('toggle-capture');
-    }
-
-    fetch(`http://${host}:3000/api/capture-key`)
-      .then(r => r.json())
-      .then(d => { captureKey = d.key || 'a'; updateCaptureBtn(false, 0); })
-      .catch(() => updateCaptureBtn(false, 0));
 
     /* ── Crab Detection ── */
     let _capturedFrame = null;
 
     function showBadge(msg, color, textColor) {
-      const badge = document.getElementById('capture-badge');
+      const badge = document.getElementById('status-badge');
       badge.textContent = msg;
       badge.style.background = color || 'rgba(0,200,100,0.92)';
       badge.style.color = textColor || '#000';
@@ -408,7 +419,7 @@
       const canvas = document.createElement('canvas');
       canvas.width = w; canvas.height = h;
       const camNum = slotToCam[selSlot];
-      const z = currentCamZooms[camNum - 1] || 1.0;
+      const z = currentSlotZooms[selSlot] || 1.0;
       try {
         const ctx = canvas.getContext('2d');
         if (z > 1.0) {
@@ -475,9 +486,7 @@
       if (key === 'Escape')          { e.preventDefault(); if (promoted) promoteToMain(0); return; }
       if (key === 'b' || key === 'B') { e.preventDefault(); captureSelectedCam(); return; }
       if (key === 'c' || key === 'C') { e.preventDefault(); runCrabInference(); return; }
-      if (key !== captureKey) return;
-      e.preventDefault();
-      toggleCapture();
+      if (key === keelKey || key === keelKey.toUpperCase()) { e.preventDefault(); captureAndKeel(); return; }
     });
 
     /* ── Drag-drop ── */
@@ -519,7 +528,6 @@
       const socket = io(`http://${host}:3000`);
       window._camSocket = socket;
       socket.on('cam-zoom-state', applyZoomState);
-      socket.on('capture-status', ({ active, count }) => updateCaptureBtn(active, count));
       socket.on('cam-restart', ({ cam }) => {
         const slotIdx = slotToCam.indexOf(cam);
         if (slotIdx === -1) return;
@@ -529,9 +537,14 @@
         const base = img.dataset.base;
         if (base) setTimeout(() => { if (img.src) img.src = base + '?t=' + Date.now(); }, 2000);
       });
-      socket.on('promote-cam', ({ cam }) => {
-        const slotIdx = slotToCam.indexOf(cam);
-        if (slotIdx !== -1) promoteToMain(slotIdx);
+      socket.on('promote-cam', ({ slot }) => {
+        if (slot >= 0 && slot < 4) promoteToMain(slot);
+      });
+
+      socket.on('key-forward', ({ key }) => {
+        if (key === 'b' || key === 'B') captureSelectedCam();
+        if (key === 'c' || key === 'C') runCrabInference();
+        if (key === keelKey || key === keelKey.toUpperCase()) captureAndKeel();
       });
     };
     document.head.appendChild(sioScript);

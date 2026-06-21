@@ -18,7 +18,7 @@ const TEENSY_PORT = 5000;
 /* ================= STATE ================= */
 let isArmed = true;
 const relayStates = { 1: false, 2: false, 3: false, 4: false };
-let latestCamZoomState = { selectedCam: 0, camZooms: [1, 1, 1, 1, 1] };
+let latestCamZoomState = { selectedSlot: -1, slotZooms: [1, 1, 1, 1] };
 
 let latestRobotData = {
   roll: 0,
@@ -183,27 +183,33 @@ app.post('/api/range', (req, res) => {
   res.json({ ok: true });
 });
 
-/* ================= CAPTURE KEY PERSISTENCE ================= */
-const CAPTURE_SETTINGS_FILE = join(__dirname, 'capture-settings.json');
+/* ================= KEEL KEY PERSISTENCE ================= */
+const KEEL_SETTINGS_FILE = join(__dirname, 'keel-settings.json');
 
-app.get('/api/capture-key', (req, res) => {
+const KEEL_CORS = (res) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+};
+
+app.options('/api/keel-key',   (req, res) => { KEEL_CORS(res); res.sendStatus(204); });
+app.options('/api/keel-depth', (req, res) => { KEEL_CORS(res); res.sendStatus(204); });
+
+app.get('/api/keel-key', (req, res) => {
+  KEEL_CORS(res);
   try {
-    res.json(JSON.parse(fs.readFileSync(CAPTURE_SETTINGS_FILE, 'utf8')));
+    res.json(JSON.parse(fs.readFileSync(KEEL_SETTINGS_FILE, 'utf8')));
   } catch {
-    res.json({ key: 'F9' });
+    res.json({ key: 'k' });
   }
 });
 
-app.post('/api/capture-key', (req, res) => {
+app.post('/api/keel-key', (req, res) => {
+  KEEL_CORS(res);
   const { key } = req.body;
-  fs.writeFileSync(CAPTURE_SETTINGS_FILE, JSON.stringify({ key }, null, 2));
-  console.log(`💾 Capture key saved: ${key}`);
+  fs.writeFileSync(KEEL_SETTINGS_FILE, JSON.stringify({ key }, null, 2));
+  console.log(`💾 Keel key saved: ${key}`);
   res.json({ ok: true });
-});
-
-app.get('/api/check-usb', (req, res) => {
-  const usbPath = getUsbPath();
-  res.json({ available: !!usbPath, path: usbPath });
 });
 
 
@@ -344,7 +350,7 @@ function createRtspCam(label, url, clients, camNum) {
 }
 
 const cam2 = createRtspCam('Cam2', 'rtsp://admin:admin@192.168.2.12:554/live/0/SUB',    camClients2, 2);
-const cam3 = createRtspCam('Cam3', 'rtsp://admin:Admin123@192.168.2.13:554/live/0/SUB', camClients3, 3);
+const cam3 = createRtspCam('Cam3', 'rtsp://admin:Admin123@192.168.2.16:554/live/0/SUB', camClients3, 3);
 const cam4 = createRtspCam('Cam4', 'rtsp://admin:Admin123@192.168.2.14:554/live/0/SUB', camClients4, 4);
 const cam5 = createRtspCam('Cam5', 'rtsp://admin:Admin123@192.168.2.15:554/live/0/SUB', camClients5, 5);
 
@@ -401,86 +407,30 @@ function mixThrusters(j){
   ];
 }
 
-/* ================= DATASET CAPTURE ================= */
-const CAM_RTSP = {
-  2: 'rtsp://admin:admin@192.168.2.12:554/live/0/SUB',
-  3: 'rtsp://admin:Admin123@192.168.2.13:554/live/0/SUB',
-  4: 'rtsp://admin:Admin123@192.168.2.14:554/live/0/SUB',
-  5: 'rtsp://admin:Admin123@192.168.2.15:554/live/0/SUB',
-};
+/* ================= KEEL DEPTH ================= */
+const KEEL_CAPTURE_PATH = join(__dirname, 'keel_capture.png');
+const KEEL_SCRIPT       = join(__dirname, '../scripts/keelDepthDetection.py');
+let keelProc = null;
 
-let captureProc      = null;
-let captureCount     = 0;
-let captureActive    = false;
-let captureOutputDir = null;
-
-function getUsbPath() {
-  const mediaBase = '/media/orin';
-  try {
-    for (const entry of fs.readdirSync(mediaBase)) {
-      const full = join(mediaBase, entry);
-      try { if (fs.statSync(full).isDirectory()) return full; } catch {}
-    }
-  } catch {}
-  return null;
-}
-
-function startCapture(outputDir) {
-  if (captureActive) return;
-  captureActive    = true;
-  captureCount     = 0;
-  captureOutputDir = outputDir;
-  const script = join(__dirname, '../scripts/capture_dataset_metashape.py');
-
-  const { selectedCam, camZooms } = latestCamZoomState;
-  const rtspUrl = CAM_RTSP[selectedCam] || CAM_RTSP[2];
-  const zoom    = (selectedCam > 0 && camZooms) ? (camZooms[selectedCam - 1] || 1.0) : 1.0;
-  console.log(`📸 Capturing from cam${selectedCam || 2} zoom×${zoom}  ${rtspUrl}`);
-  console.log(`📸 Output: ${outputDir}`);
-
-  const spawnArgs = ['-u', script, '--rtsp-url', rtspUrl, '--zoom', String(zoom)];
-  if (outputDir) spawnArgs.push('--output-dir', outputDir);
-
-  captureProc = spawn('python3', spawnArgs);
-  captureProc.stdout.on('data', (data) => {
-    for (const line of data.toString().trim().split('\n')) {
-      if (line.startsWith('DONE:')) {
-        const parts   = line.split(':');
-        captureCount  = parseInt(parts[1]) || captureCount;
-        const doneDir = parts.slice(2).join(':') || captureOutputDir || '';
-        captureActive    = false;
-        captureProc      = null;
-        captureOutputDir = null;
-        io.emit('capture-status', { active: false, count: captureCount });
-        io.emit('capture-done', { count: captureCount, outputDir: doneDir });
-      } else {
-        const n = parseInt(line);
-        if (!isNaN(n)) {
-          captureCount = n;
-          io.emit('capture-status', { active: true, count: captureCount });
-        }
-      }
-    }
+app.post('/api/keel-depth', (req, res) => {
+  KEEL_CORS(res);
+  if (keelProc) return res.json({ error: 'already running' });
+  const { image } = req.body;
+  if (!image) return res.status(400).json({ error: 'no image' });
+  const b64 = image.replace(/^data:image\/\w+;base64,/, '');
+  fs.writeFileSync(KEEL_CAPTURE_PATH, Buffer.from(b64, 'base64'));
+  keelProc = spawn('python3', [KEEL_SCRIPT, '--image', KEEL_CAPTURE_PATH], {
+    env: { ...process.env, DISPLAY: process.env.DISPLAY || ':0' },
+    stdio: 'inherit',
   });
-  captureProc.on('exit', () => {
-    if (captureActive) {
-      captureActive    = false;
-      captureProc      = null;
-      captureOutputDir = null;
-      io.emit('capture-status', { active: false, count: captureCount });
-    }
+  keelProc.on('error', (err) => {
+    console.error('⚠️ Keel process error:', err.message);
+    keelProc = null;
   });
-  io.emit('capture-status', { active: true, count: 0 });
-  console.log('📸 Dataset capture started');
-}
-
-function stopCapture() {
-  if (captureProc) { captureProc.kill('SIGTERM'); captureProc = null; }
-  captureActive    = false;
-  captureOutputDir = null;
-  io.emit('capture-status', { active: false, count: captureCount });
-  console.log(`📸 Dataset capture stopped — ${captureCount} frames`);
-}
+  keelProc.on('exit', () => { keelProc = null; });
+  console.log('📐 Keel depth tool opened');
+  res.json({ ok: true });
+});
 
 /* ================= SOCKET.IO ================= */
 io.on('connection', socket=>{
@@ -489,7 +439,6 @@ io.on('connection', socket=>{
   socket.emit('robot-data', latestRobotData);
   socket.emit('calibration-state', { dirs: thrusterDirs, selected: thrusterSelected });
   socket.emit('cam-zoom-state', latestCamZoomState);
-  socket.emit('capture-status', { active: captureActive, count: captureCount });
   socket.emit('relay-states', relayStates);
 
   socket.on('toggle-direction', (id) => {
@@ -568,19 +517,8 @@ io.on('connection', socket=>{
     socket.broadcast.emit('promote-cam', data);
   });
 
-  socket.on('toggle-capture', () => {
-    if (captureActive) stopCapture();
-  });
-
-  socket.on('start-capture', ({ useUsb }) => {
-    if (captureActive) return;
-    const usbPath = useUsb ? getUsbPath() : null;
-    const now = new Date();
-    const pad = n => String(n).padStart(2, '0');
-    const ts  = `${now.getFullYear()}${pad(now.getMonth()+1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
-    const baseDir   = usbPath ? join(usbPath, 'dataset') : join(__dirname, '../dataset');
-    const outputDir = join(baseDir, `metashape_${ts}`);
-    startCapture(outputDir);
+  socket.on('key-forward', (data) => {
+    socket.broadcast.emit('key-forward', data);
   });
 });
 

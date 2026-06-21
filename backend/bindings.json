@@ -29,7 +29,7 @@
   "btnArm": 8,
   "btnDisarm": 9,
   "btnLight1": -1,
-  "btnLight2": -1,
+  "btnLight2": "key:KeyH",
   "btnLight3": -1,
   "btnLight4": -1,
   "btnStabilize": 1

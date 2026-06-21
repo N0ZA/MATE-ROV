@@ -4,7 +4,7 @@ import numpy as np
 
 # ---------- CONFIG ----------
 REF_LENGTH_CM = 15.0   # known reference length in cm (corner marker)
-NUM_REF_LINES = 2      # number of reference lines to average (more = more accurate)
+NUM_REF_LINES = 1      # number of reference lines to average (more = more accurate)
 PIPE_OD_MM    = 21.3   # 1/2" sch40 PVC OD, used by the diameter cross-check
 # ----------------------------
 # Scoring reminder:  error <= 5 cm -> 10 pts ;  5.01-10 cm -> 5 pts
@@ -152,7 +152,9 @@ def diameter_cross_check(img):
         for p in pts:
             cv2.circle(show, p, 4, (255, 80, 0), -1)
         cv2.imshow(win, show)
-        if cv2.waitKey(1) & 0xFF == ord('q') or len(pts) == 4:
+        if cv2.waitKey(30) & 0xFF == ord('q') or len(pts) == 4:
+            break
+        if cv2.getWindowProperty(win, cv2.WND_PROP_VISIBLE) < 1:
             break
     cv2.destroyWindow(win)
     if len(pts) == 4:
@@ -185,11 +187,11 @@ def run(image_path=None, source=None):
             if not ok:
                 break
             cv2.imshow("feed", f)
-            k = cv2.waitKey(1) & 0xFF
+            k = cv2.waitKey(30) & 0xFF
             if k == ord(' '):
                 img = f.copy()
                 break
-            if k == ord('q'):
+            if k == ord('q') or cv2.getWindowProperty("feed", cv2.WND_PROP_VISIBLE) < 1:
                 cap.release()
                 cv2.destroyAllWindows()
                 return
@@ -210,7 +212,9 @@ def run(image_path=None, source=None):
 
     while True:
         cv2.imshow("measure", m.img)
-        k = cv2.waitKey(1) & 0xFF
+        if cv2.getWindowProperty("measure", cv2.WND_PROP_VISIBLE) < 1:
+            break
+        k = cv2.waitKey(30) & 0xFF
 
         if k == ord('r'):
             m = KeelMeasurer(img)
@@ -243,7 +247,7 @@ if __name__ == "__main__":
     parser.add_argument("--image",    default=None,
                         help="path to an image file")
     parser.add_argument("--rtsp-url",
-                        default="rtsp://admin:admin@192.168.2.12:554/live/0/SUB",
+                        default="rtsp://admin:Admin123@192.168.2.16:554/live/0/SUB",
                         help="RTSP stream URL (default: cam2)")
     args = parser.parse_args()
 
