@@ -24,14 +24,18 @@ parse_geom() {
 read W1 H1 X1 Y1 <<< $(parse_geom "$MON1")
 read W2 H2 X2 Y2 <<< $(parse_geom "$MON2")
 
-# Control UI on monitor 1
+# Control UI on monitor 2
 chromium-browser --app=http://localhost:3000 \
-    --window-position=${X1},${Y1} \
-    --window-size=${W1},${H1} &
-
-sleep 1
-
-# Camera UI on monitor 2
-chromium-browser --app=http://localhost:3001 \
+    --user-data-dir=/tmp/chrome-control \
+    --no-first-run \
     --window-position=${X2},${Y2} \
     --window-size=${W2},${H2} &
+
+sleep 2
+
+# Camera UI on monitor 1
+chromium-browser --app=http://localhost:3001 \
+    --user-data-dir=/tmp/chrome-camera \
+    --no-first-run \
+    --window-position=${X1},${Y1} \
+    --window-size=${W1},${H1} &

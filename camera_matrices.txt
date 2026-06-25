@@ -1,0 +1,9 @@
+LEFT ARM CAMERA 192.168.2.12
+FISHEYE       = True
+CAMERA_MATRIX = np.array([[631.69336823,   0.        , 395.85630862],
+ [  0.        , 631.06251341, 251.80559769],
+ [  0.        ,   0.        ,   1.        ]], dtype=np.float64)
+DIST_COEFFS   = np.array([-9.83155346e-02, 3.74382797e-01, -1.61267810e+00, 1.78189287e+00], dtype=np.float64)
+========================================================
+
+Press U to preview undistortion.

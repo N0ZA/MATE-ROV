@@ -377,8 +377,8 @@ function createRtspCam(label, url, clients, camNum) {
   return { start, stop };
 }
 
-const cam2 = createRtspCam('Cam2', 'rtsp://admin:admin@192.168.2.12:554/live/0/SUB',    camClients2, 2);
-const cam3 = createRtspCam('Cam3', 'rtsp://admin:Admin123@192.168.2.16:554/live/0/SUB', camClients3, 3);
+const cam2 = createRtspCam('Cam2', 'rtsp://admin:Admin123@192.168.2.12:554/live/0/SUB',    camClients2, 2);
+const cam3 = createRtspCam('Cam3', 'rtsp://admin:Admin123@192.168.2.13:554/live/0/SUB', camClients3, 3);
 const cam4 = createRtspCam('Cam4', 'rtsp://admin:Admin123@192.168.2.14:554/live/0/SUB', camClients4, 4);
 const cam5 = createRtspCam('Cam5', 'rtsp://admin:Admin123@192.168.2.15:554/live/0/SUB', camClients5, 5);
 
