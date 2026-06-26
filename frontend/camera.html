@@ -137,6 +137,37 @@
       pointer-events: none;
     }
 
+    /* ── keel depth overlay ── */
+    #keel-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.96);
+      z-index: 10001;
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+    #keel-overlay.open { display: flex; }
+    #keel-topbar {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      font-family: Consolas, monospace;
+      font-size: 13px;
+      color: #c4b5fd;
+    }
+    #keel-topbar .keel-hint { color: #888; font-size: 11px; }
+    #keel-canvas {
+      max-width: 92vw;
+      max-height: 85vh;
+      cursor: crosshair;
+      border: 2px solid #c4b5fd;
+      border-radius: 4px;
+      display: block;
+    }
+
     /* ── inference overlay ── */
     #infer-overlay {
       position: fixed;
@@ -165,6 +196,14 @@
 </head>
 <body>
   <div id="status-badge"></div>
+
+  <div id="keel-overlay">
+    <div id="keel-topbar">
+      <span id="keel-phase">📐 Keel Depth</span>
+      <span class="keel-hint">Z = undo &nbsp;|&nbsp; R = reset &nbsp;|&nbsp; Esc = close</span>
+    </div>
+    <canvas id="keel-canvas"></canvas>
+  </div>
 
   <div id="infer-overlay" onclick="closeInfer()">
     <div id="infer-status">🔍 Running crab detection...</div>
@@ -381,21 +420,31 @@
       .then(d => { keelKey = d.key || 'k'; })
       .catch(() => {});
 
+    const KEEL_REF_CM = 15.0;
+    let keelState = null;
+
     function captureAndKeel() {
+      if (document.getElementById('keel-overlay').classList.contains('open')) return;
       let selSlot = -1;
       for (let s = 0; s < 4; s++) {
         if (document.getElementById(`slot${s}`)?.classList.contains('cam-selected')) { selSlot = s; break; }
       }
-      if (selSlot === -1) { showBadge('⚠ No camera selected — use controller to select one', '#f59e0b', '#000'); return; }
+      if (selSlot === -1) {
+        for (let s = 0; s < 4; s++) {
+          const i = document.getElementById(`img${s}`);
+          if (i && i.style.display !== 'none' && i.naturalWidth > 0) { selSlot = s; break; }
+        }
+      }
+      if (selSlot === -1) { showBadge('⚠ No camera signal available', '#ef4444', '#fff'); return; }
       const img = document.getElementById(`img${selSlot}`);
       if (!img || img.style.display === 'none') { showBadge('⚠ No signal on selected camera', '#ef4444', '#fff'); return; }
       const w = img.naturalWidth  > 0 ? img.naturalWidth  : img.clientWidth  || 640;
       const h = img.naturalHeight > 0 ? img.naturalHeight : img.clientHeight || 480;
-      const canvas = document.createElement('canvas');
-      canvas.width = w; canvas.height = h;
       const z = currentSlotZooms[selSlot] || 1.0;
+      const kc = document.getElementById('keel-canvas');
+      kc.width = w; kc.height = h;
+      const ctx = kc.getContext('2d');
       try {
-        const ctx = canvas.getContext('2d');
         if (z > 1.0) {
           const cw = Math.floor(w / z), ch = Math.floor(h / z);
           const x0 = Math.floor((w - cw) / 2), y0 = Math.floor((h - ch) / 2);
@@ -403,24 +452,119 @@
         } else {
           ctx.drawImage(img, 0, 0, w, h);
         }
-        const imageData = canvas.toDataURL('image/png');
-        showBadge('📐 Opening keel depth tool...', '#3d2972', '#c4b5fd');
-        fetch(`http://${host}:3000/api/keel-depth`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ image: imageData })
-        })
-        .then(r => r.json())
-        .then(d => {
-          if (d.error) showBadge('⚠ ' + d.error, '#ef4444', '#fff');
-          else showBadge('📐 Keel tool opened — use mouse to measure', 'rgba(0,200,100,0.92)', '#000');
-        })
-        .catch(err => showBadge('⚠ Error: ' + err.message, '#ef4444', '#fff'));
       } catch (err) {
-        showBadge('⚠ Capture failed — check server logs', '#ef4444', '#fff');
-        console.error('Keel capture error:', err);
+        showBadge('⚠ Capture failed (CORS?)', '#ef4444', '#fff');
+        return;
       }
+      keelState = { base: ctx.getImageData(0, 0, w, h), mode: 'ref', refLines: [], curRef: [], keelPts: [], pxPerCm: null };
+      document.getElementById('keel-overlay').classList.add('open');
+      keelRedraw();
     }
+
+    function keelCanvasCoords(e) {
+      const kc = document.getElementById('keel-canvas');
+      const r  = kc.getBoundingClientRect();
+      return [Math.round((e.clientX - r.left) * kc.width / r.width),
+              Math.round((e.clientY - r.top)  * kc.height / r.height)];
+    }
+
+    function keelClick(e) {
+      if (!keelState) return;
+      const [x, y] = keelCanvasCoords(e);
+      const s = keelState;
+      if (s.mode === 'ref') {
+        s.curRef.push([x, y]);
+        if (s.curRef.length === 2) {
+          s.refLines.push([s.curRef[0], s.curRef[1]]);
+          s.curRef = [];
+          const avg = s.refLines.reduce((a, [p1, p2]) => a + Math.hypot(p2[0]-p1[0], p2[1]-p1[1]), 0) / s.refLines.length;
+          s.pxPerCm = avg / KEEL_REF_CM;
+          s.mode = 'keel';
+        }
+      } else {
+        s.keelPts.push([x, y]);
+      }
+      keelRedraw();
+    }
+
+    function keelUndo() {
+      if (!keelState) return;
+      const s = keelState;
+      if (s.mode === 'keel' && s.keelPts.length > 0) {
+        s.keelPts.pop();
+      } else if (s.curRef.length > 0) {
+        s.curRef.pop();
+      } else if (s.refLines.length > 0) {
+        s.refLines.pop();
+        s.mode = 'ref';
+        s.pxPerCm = s.refLines.length
+          ? s.refLines.reduce((a, [p1, p2]) => a + Math.hypot(p2[0]-p1[0], p2[1]-p1[1]), 0) / s.refLines.length / KEEL_REF_CM
+          : null;
+      }
+      keelRedraw();
+    }
+
+    function keelReset() {
+      if (!keelState) return;
+      const b = keelState.base;
+      keelState = { base: b, mode: 'ref', refLines: [], curRef: [], keelPts: [], pxPerCm: null };
+      keelRedraw();
+    }
+
+    function closeKeelOverlay() {
+      document.getElementById('keel-overlay').classList.remove('open');
+      keelState = null;
+    }
+
+    function keelRedraw() {
+      if (!keelState) return;
+      const kc  = document.getElementById('keel-canvas');
+      const ctx = kc.getContext('2d');
+      const s   = keelState;
+      ctx.putImageData(s.base, 0, 0);
+
+      // reference lines
+      const refCols = ['#0050ff', '#00b4ff', '#00ffdc'];
+      s.refLines.forEach(([p1, p2], i) => {
+        const c = refCols[i % refCols.length];
+        ctx.strokeStyle = c; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(p1[0], p1[1]); ctx.lineTo(p2[0], p2[1]); ctx.stroke();
+        [p1, p2].forEach(p => { ctx.fillStyle = c; ctx.beginPath(); ctx.arc(p[0], p[1], 5, 0, 2*Math.PI); ctx.fill(); });
+      });
+      s.curRef.forEach(([x, y]) => {
+        ctx.fillStyle = '#0040c0'; ctx.beginPath(); ctx.arc(x, y, 5, 0, 2*Math.PI); ctx.fill();
+      });
+
+      // keel polyline
+      for (let i = 1; i < s.keelPts.length; i++) {
+        ctx.strokeStyle = '#00ff3c'; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(s.keelPts[i-1][0], s.keelPts[i-1][1]); ctx.lineTo(s.keelPts[i][0], s.keelPts[i][1]); ctx.stroke();
+      }
+      s.keelPts.forEach(([x, y], i) => {
+        ctx.fillStyle = '#00ff3c'; ctx.beginPath(); ctx.arc(x, y, 4, 0, 2*Math.PI); ctx.fill();
+        if (i === 0 || i === s.keelPts.length - 1) {
+          ctx.strokeStyle = i === 0 ? '#ffff00' : '#ff6400'; ctx.lineWidth = 2;
+          ctx.beginPath(); ctx.arc(x, y, 7, 0, 2*Math.PI); ctx.stroke();
+        }
+      });
+
+      // status bar
+      let L = null;
+      if (s.pxPerCm && s.keelPts.length >= 2) {
+        L = s.keelPts.reduce((a, p, i) => i === 0 ? 0 : a + Math.hypot(p[0]-s.keelPts[i-1][0], p[1]-s.keelPts[i-1][1]), 0) / s.pxPerCm;
+      }
+      ctx.fillStyle = 'rgba(0,0,0,0.78)'; ctx.fillRect(0, 0, kc.width, 32);
+      ctx.fillStyle = '#fff'; ctx.font = `${Math.max(12, Math.min(16, kc.width / 50))}px Consolas, monospace`;
+      let msg;
+      if (L !== null)           msg = `KEEL: ${L.toFixed(1)} cm  =  ${(L/100).toFixed(3)} m   [${s.pxPerCm.toFixed(2)} px/cm]`;
+      else if (s.mode === 'ref') msg = s.curRef.length ? `Click 2nd end of reference  (${KEEL_REF_CM}cm)` : `Click 1st end of reference  (${KEEL_REF_CM}cm known)`;
+      else                       msg = `Reference: ${s.pxPerCm.toFixed(2)} px/cm  —  click keel top → bottom`;
+      ctx.fillText(msg, 8, 22);
+
+      document.getElementById('keel-phase').textContent = L !== null ? `📐 ${L.toFixed(1)} cm = ${(L/100).toFixed(3)} m` : (s.mode === 'ref' ? '📐 Set reference line' : '📐 Trace keel outline');
+    }
+
+    document.getElementById('keel-canvas').addEventListener('click', keelClick);
 
     /* ── Crab Detection ── */
     let _capturedFrame = null;
@@ -510,9 +654,15 @@
     }
 
     document.addEventListener('keydown', (e) => {
+      if (document.getElementById('keel-overlay').classList.contains('open')) {
+        if (e.key === 'Escape')                  { e.preventDefault(); closeKeelOverlay(); return; }
+        if (e.key === 'z' || e.key === 'Z')      { e.preventDefault(); keelUndo();         return; }
+        if (e.key === 'r' || e.key === 'R')      { e.preventDefault(); keelReset();        return; }
+        return;
+      }
       if (document.getElementById('infer-overlay').classList.contains('open')) { closeInfer(); return; }
       const key = e.key === ' ' ? 'Space' : e.key;
-      if (key === 'Escape')          { e.preventDefault(); if (promoted) promoteToMain(0); return; }
+      if (key === 'Escape')           { e.preventDefault(); if (promoted) promoteToMain(0); return; }
       if (key === 'b' || key === 'B') { e.preventDefault(); captureSelectedCam(); return; }
       if (key === 'c' || key === 'C') { e.preventDefault(); runCrabInference(); return; }
       if (key === 'u' || key === 'U') { e.preventDefault(); if (window._camSocket) window._camSocket.emit('cam2-undistort-toggle'); return; }
@@ -580,6 +730,10 @@
       socket.on('cam2-undistort-state', ({ active }) => {
         cam2UndistortActive = active;
         updateUndistortBadges();
+      });
+
+      socket.on('keel-error', ({ message }) => {
+        showBadge('⚠ Keel: ' + message.slice(0, 100), '#ef4444', '#fff');
       });
     };
     document.head.appendChild(sioScript);

@@ -154,7 +154,7 @@ def diameter_cross_check(img):
         cv2.imshow(win, show)
         if cv2.waitKey(30) & 0xFF == ord('q') or len(pts) == 4:
             break
-        if cv2.getWindowProperty(win, cv2.WND_PROP_VISIBLE) < 1:
+        if cv2.getWindowProperty(win, cv2.WND_PROP_VISIBLE) == 0:
             break
     cv2.destroyWindow(win)
     if len(pts) == 4:
@@ -212,7 +212,7 @@ def run(image_path=None, source=None):
 
     while True:
         cv2.imshow("measure", m.img)
-        if cv2.getWindowProperty("measure", cv2.WND_PROP_VISIBLE) < 1:
+        if cv2.getWindowProperty("measure", cv2.WND_PROP_VISIBLE) == 0:
             break
         k = cv2.waitKey(30) & 0xFF
 

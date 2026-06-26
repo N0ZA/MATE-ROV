@@ -549,13 +549,24 @@ app.post('/api/keel-depth', (req, res) => {
   fs.writeFileSync(KEEL_CAPTURE_PATH, Buffer.from(b64, 'base64'));
   keelProc = spawn('python3', [KEEL_SCRIPT, '--image', KEEL_CAPTURE_PATH], {
     env: { ...process.env, DISPLAY: process.env.DISPLAY || ':0' },
-    stdio: 'inherit',
+    stdio: ['ignore', 'pipe', 'pipe'],
   });
+  let keelStderr = '';
+  keelProc.stderr.on('data', (d) => { keelStderr += d.toString(); });
+  keelProc.stdout.on('data', (d) => { process.stdout.write(d); });
   keelProc.on('error', (err) => {
     console.error('⚠️ Keel process error:', err.message);
-    keelProc = null;
+    io.emit('keel-error', { message: err.message });
+    keelProc = null; keelStderr = '';
   });
-  keelProc.on('exit', () => { keelProc = null; });
+  keelProc.on('exit', (code) => {
+    if (code !== 0 && code !== null) {
+      const msg = keelStderr.trim() || `python3 exited with code ${code}`;
+      console.error('⚠️ Keel process exited:', msg);
+      io.emit('keel-error', { message: msg.slice(0, 200) });
+    }
+    keelProc = null; keelStderr = '';
+  });
   console.log('📐 Keel depth tool opened');
   res.json({ ok: true });
 });
