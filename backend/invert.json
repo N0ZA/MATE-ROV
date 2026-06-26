@@ -13,10 +13,10 @@
   "imuRoll": false,
   "arm1Slew": true,
   "arm1Shoulder": true,
-  "arm1Rotate": false,
-  "arm1Gripper": true,
+  "arm1Rotate": true,
+  "arm1Gripper": false,
   "arm2Slew": true,
   "arm2Shoulder": true,
-  "arm2Rotate": false,
-  "arm2Gripper": true
+  "arm2Rotate": true,
+  "arm2Gripper": false
 }

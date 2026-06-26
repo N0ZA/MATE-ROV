@@ -78,7 +78,7 @@ function mixAndSend() {
     vl/=maxV; vr/=maxV;
 
     const pwmMinH = 1500 - g  * 300, pwmMaxH = 1500 + g  * 300;
-    const pwmMinV = 1500 - vg * 300, pwmMaxV = 1500 + vg * 300;
+    const pwmMinV = 1500 - vg * 500, pwmMaxV = 1500 + vg * 500;
 
     const anySelected = [7, 8, 9, 10, 11, 12].some(i => Atomics.load(ctrlState, i));
     const mask = id => (anySelected && !Atomics.load(ctrlState, 6 + id)) ? 0 : 1;

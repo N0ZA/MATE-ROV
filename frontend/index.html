@@ -25,9 +25,10 @@
     .right-column { overflow-y: auto; padding-left: 4px; min-height: 0; }
     .cam-strip { overflow: hidden; padding-left: 4px; min-height: 0; display: flex; flex-direction: column; gap: 4px; }
     .cam-strip-title { flex-shrink: 0; font-size: 10px; font-weight: bold; letter-spacing: 1px; color: var(--s1); text-transform: uppercase; text-align: center; padding: 4px 0 2px; border-bottom: 1px solid var(--p); margin-bottom: 2px; }
-    .cam-slot { flex: 1; min-height: 0; overflow: hidden; display: flex; flex-direction: column; align-items: center; }
+    .cam-slot { flex: 1; min-height: 0; overflow: hidden; display: flex; flex-direction: column; align-items: center; position: relative; }
     .cam-slot img { width: 100%; aspect-ratio: 16 / 9; object-fit: contain; border-radius: 4px; border: 1px solid var(--p); background: #000; display: block; }
 .cam-label { flex-shrink: 0; font-size: 9px; color: var(--s1); text-align: center; }
+    .undistort-badge { display: none; position: absolute; bottom: 18px; left: 4px; background: rgba(13,8,34,0.88); color: #4ade80; font-size: 8px; font-weight: bold; padding: 2px 5px; border-radius: 3px; border: 1px solid #4ade80; pointer-events: none; letter-spacing: 0.5px; z-index: 3; }
 
     .dual-gimbals { display: flex; justify-content: space-between; gap: 10px; padding: 10px 0; }
     .gimbal-wrap { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 5px; }
@@ -388,7 +389,7 @@
     <!-- Camera strip -->
     <div class="column cam-strip">
       <div class="cam-strip-title">CAMERAS</div>
-      <div class="cam-slot"><img id="cs-cam2" src="" alt="CAM 2" /><div class="cam-label">CAM 2</div></div>
+      <div class="cam-slot"><img id="cs-cam2" src="" alt="CAM 2" /><div class="undistort-badge" id="cam2-undistort-badge">UNDISTORT</div><div class="cam-label">CAM 2</div></div>
       <div class="cam-slot"><img id="cs-cam3" src="" alt="CAM 3" /><div class="cam-label">CAM 3</div></div>
       <div class="cam-slot"><img id="cs-cam4" src="" alt="CAM 4" /><div class="cam-label">CAM 4</div></div>
       <div class="cam-slot"><img id="cs-cam5" src="" alt="CAM 5" /><div class="cam-label">CAM 5</div></div>
@@ -918,6 +919,11 @@
     setTimeout(() => { if (img.src) img.src = base + '?t=' + Date.now(); }, 2000);
   });
 
+  socket.on('cam2-undistort-state', ({ active }) => {
+    const badge = document.getElementById('cam2-undistort-badge');
+    if (badge) badge.style.display = active ? 'block' : 'none';
+  });
+
   socket.on('robot-data', (data) => {
     const yaw = Number(data.yaw) || 0;
     const pitch = Number(data.pitch) || 0;
@@ -1191,7 +1197,7 @@
   let depthHoldActive = false, depthHoldTarget = 0;
   let depthHoldStep = parseFloat(localStorage.getItem('depthHoldStep') || '0.02');
   let yawHoldStep   = parseFloat(localStorage.getItem('yawHoldStep')   || '5');
-  let rollHoldActive  = true,  rollHoldTarget  = 0;
+  let rollHoldActive  = false,  rollHoldTarget  = 0;
   let yawHoldActive   = false, yawHoldTarget   = 0;
 
   let latestDepth   = 0;
@@ -1958,6 +1964,7 @@
     const key = e.key === ' ' ? 'Space' : e.key;
     if (key === 'b' || key === 'B') { e.preventDefault(); socket.emit('key-forward', { key: 'b' }); return; }
     if (key === 'c' || key === 'C') { e.preventDefault(); socket.emit('key-forward', { key: 'c' }); return; }
+    if (key === 'u' || key === 'U') { e.preventDefault(); socket.emit('cam2-undistort-toggle'); return; }
     if (key === keelKey || key === keelKey.toUpperCase()) { e.preventDefault(); socket.emit('key-forward', { key: keelKey }); return; }
   });
 

@@ -17,6 +17,8 @@ const TEENSY_PORT = 5000;
 
 /* ================= STATE ================= */
 let isArmed = true;
+let cam2UndistortMode = false;
+const CAM2_UNDISTORT_SCRIPT = join(__dirname, '../scripts/undistort_mjpeg.py');
 const relayStates = { 1: false, 2: false, 3: false, 4: false };
 let latestCamZoomState = { selectedSlot: -1, slotZooms: [1, 1, 1, 1] };
 
@@ -377,7 +379,105 @@ function createRtspCam(label, url, clients, camNum) {
   return { start, stop };
 }
 
-const cam2 = createRtspCam('Cam2', 'rtsp://admin:Admin123@192.168.2.12:554/live/0/SUB',    camClients2, 2);
+function createCam2(label, url, clients, camNum) {
+  const args = [
+    'rtspsrc', `location=${url}`, 'latency=0', 'protocols=tcp',
+    '!', 'rtph265depay',
+    '!', 'nvv4l2decoder',
+    '!', 'nvvidconv',
+    '!', 'video/x-raw,format=I420',
+    '!', 'jpegenc', 'quality=80',
+    '!', 'multipartmux', 'boundary=frame',
+    '!', 'fdsink', 'fd=1',
+  ];
+
+  let proc           = null;
+  let undistortProc  = null;
+  let watchdog       = null;
+  let pendingRestart = false;
+  let streaming      = false;
+
+  function setWatchdog(ms) {
+    if (watchdog) clearTimeout(watchdog);
+    watchdog = setTimeout(() => {
+      const phase = streaming ? 'stream timeout' : 'connection timeout';
+      console.warn(`⚠️ ${label} ${phase} — restarting`);
+      if (undistortProc) { undistortProc.kill('SIGKILL'); undistortProc = null; }
+      if (proc) { proc.kill('SIGKILL'); proc = null; }
+      scheduleRestart(2000);
+    }, ms);
+  }
+
+  function scheduleRestart(delay = 5000) {
+    if (pendingRestart) return;
+    pendingRestart = true;
+    if (streaming) io.emit('cam-restart', { cam: camNum });
+    setTimeout(() => { pendingRestart = false; start(); }, delay);
+  }
+
+  function start() {
+    if (proc) return;
+    streaming = false;
+    proc = spawn('gst-launch-1.0', args);
+    setWatchdog(CONNECT_MS);
+
+    let dataSource = proc.stdout;
+
+    if (cam2UndistortMode) {
+      undistortProc = spawn('python3', [CAM2_UNDISTORT_SCRIPT]);
+      proc.stdout.pipe(undistortProc.stdin);
+      undistortProc.stderr.on('data', () => {});
+      undistortProc.on('error', () => {});
+      dataSource = undistortProc.stdout;
+    }
+
+    proc.on('error', err => {
+      if (watchdog) { clearTimeout(watchdog); watchdog = null; }
+      proc = null;
+      if (undistortProc) { undistortProc.kill(); undistortProc = null; }
+      if (err.code === 'ENOENT') { console.warn(`⚠️ GStreamer not found — ${label} disabled`); return; }
+      scheduleRestart();
+    });
+
+    dataSource.on('data', chunk => {
+      if (!streaming) {
+        streaming = true;
+        console.log(`✓ ${label} streaming${cam2UndistortMode ? ' (undistorted)' : ''}`);
+      }
+      setWatchdog(STREAM_MS);
+      for (const res of clients) {
+        try {
+          res.write(chunk);
+          if (res.writableLength > 8 * 1024 * 1024) {
+            clients.delete(res);
+            res.destroy();
+          }
+        } catch { clients.delete(res); }
+      }
+    });
+
+    proc.stderr.on('data', () => {});
+
+    proc.on('exit', () => {
+      if (watchdog) { clearTimeout(watchdog); watchdog = null; }
+      if (!proc) return;
+      proc = null;
+      if (undistortProc) { undistortProc.kill(); undistortProc = null; }
+      console.warn(`⚠️ ${label} exited — retrying in 5s`);
+      scheduleRestart();
+    });
+  }
+
+  function stop() {
+    if (watchdog) { clearTimeout(watchdog); watchdog = null; }
+    if (undistortProc) { undistortProc.kill(); undistortProc = null; }
+    if (proc) { proc.kill(); proc = null; }
+  }
+
+  return { start, stop };
+}
+
+const cam2 = createCam2('Cam2', 'rtsp://admin:Admin123@192.168.2.12:554/live/0/SUB', camClients2, 2);
 const cam3 = createRtspCam('Cam3', 'rtsp://admin:Admin123@192.168.2.13:554/live/0/SUB', camClients3, 3);
 const cam4 = createRtspCam('Cam4', 'rtsp://admin:Admin123@192.168.2.14:554/live/0/SUB', camClients4, 4);
 const cam5 = createRtspCam('Cam5', 'rtsp://admin:Admin123@192.168.2.15:554/live/0/SUB', camClients5, 5);
@@ -468,6 +568,7 @@ io.on('connection', socket=>{
   socket.emit('calibration-state', { dirs: thrusterDirs, selected: thrusterSelected });
   socket.emit('cam-zoom-state', latestCamZoomState);
   socket.emit('relay-states', relayStates);
+  socket.emit('cam2-undistort-state', { active: cam2UndistortMode });
 
   socket.on('toggle-direction', (id) => {
     thrusterDirs[id] *= -1;
@@ -547,6 +648,15 @@ io.on('connection', socket=>{
 
   socket.on('key-forward', (data) => {
     socket.broadcast.emit('key-forward', data);
+  });
+
+  socket.on('cam2-undistort-toggle', () => {
+    cam2UndistortMode = !cam2UndistortMode;
+    io.emit('cam2-undistort-state', { active: cam2UndistortMode });
+    io.emit('cam-restart', { cam: 2 });
+    cam2.stop();
+    setTimeout(() => cam2.start(), 1500);
+    console.log(`🔭 Cam2 undistort: ${cam2UndistortMode ? 'ON' : 'OFF'}`);
   });
 });
 
